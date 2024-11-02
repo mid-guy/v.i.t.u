@@ -11,26 +11,13 @@ on:
       - main
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3 # Still the latest version
-
+      - uses: actions/checkout@v3
       - name: Set up Node.js
         uses: actions/setup-node@v3
         with:
-          node-version: '20' # Explicitly specify Node 20
-          registry-url: 'https://registry.npmjs.org'
-
-      - name: Install dependencies
-        run: npm install
-
-      - name: Build the project
-        run: npm run build
-
-      - name: Publish package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} # Ensure this secret is set in your GitHub repo
-        run: npm publish --access public
+          node-version: '20'
+      - run: npm install
+      - run: npm test
