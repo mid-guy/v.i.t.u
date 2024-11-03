@@ -1,4 +1,4 @@
-name: Build and Test
+name: Build, Test, and Publish
 
 on:
   push:
@@ -20,10 +20,8 @@ jobs:
         with:
           node-version: '20'
       - run: npm install
-
-publish:
+  publish:
     needs: build
-    if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v3
@@ -32,8 +30,7 @@ publish:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
-      - run: npm install
-      - name: Publish to NPM
-        run: npm publish
+      - run: npm publish --access public
+        working-directory: dist # Only the publish step should use working-directory: dist
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

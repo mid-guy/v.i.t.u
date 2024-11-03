@@ -1,31 +1,45 @@
-name: Publish to npm from release.yml
+name: Build, Test, and Publish
 
 on:
   push:
+    branches:
+      - main
     tags:
-      - 'v*' # Trigger workflow on version tags like v1.0.0
+      - 'v*'
+  pull_request:
+    branches:
+      - main
 
 jobs:
-  publish:
+  build:
     runs-on: ubuntu-latest
-
     steps:
-      - name: Checkout code
-        uses: actions/checkout@v3 # Updated to v3
-
+      - uses: actions/checkout@v3
       - name: Set up Node.js
-        uses: actions/setup-node@v3 # Updated to v3
+        uses: actions/setup-node@v3
         with:
-          node-version: '16' # Specify your Node.js version here
-          registry-url: 'https://registry.npmjs.org'
+          node-version: '20'
+      - run: npm install
+
+  publish:
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v3
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+          registry-url: 'https://registry.npmjs.org/'
 
       - name: Install dependencies
-        run: npm install
+        run: npm install # Install Rollup and other dependencies
 
-      - name: Build the project
+      - name: Build project
         run: npm run build
 
-      - name: Publish package
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }} # Ensure you have set this secret in your GitHub repo
+      - name: Publish to npm
         run: npm publish --access public
+        working-directory: dist
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

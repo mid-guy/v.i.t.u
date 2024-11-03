@@ -25,7 +25,12 @@ module.exports = {
 			presets: ['@babel/preset-env'],
 		}),
 		copy({
-			targets: [{ src: 'src/types.d.ts', dest: 'dist' }],
+			targets: [
+				{ src: 'src/types.d.ts', dest: 'dist' },
+				{ src: 'package.json', dest: 'dist' },
+				{ src: 'README.md', dest: 'dist' },
+				{ src: 'rollup.config.js', dest: 'dist' }, // Copy rollup.config.js to dist
+			],
 		}),
 	],
 };
