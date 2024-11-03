@@ -27,8 +27,9 @@ module.exports = {
 		copy({
 			targets: [
 				{ src: 'src/types.d.ts', dest: 'dist' },
-				{ src: 'package.json', dest: 'dist' }, // Copy package.json to dist
-				{ src: 'README.md', dest: 'dist' }, // Optional: copy README for npm
+				{ src: 'package.json', dest: 'dist' },
+				{ src: 'README.md', dest: 'dist' },
+				{ src: 'rollup.config.js', dest: 'dist' }, // Copy rollup.config.js to dist
 			],
 		}),
 	],

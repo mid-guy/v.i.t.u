@@ -20,8 +20,6 @@ jobs:
         with:
           node-version: '20'
       - run: npm install
-      - run: npm run build # Run build from the root directory (no working-directory here)
-
   publish:
     needs: build
     runs-on: ubuntu-latest
@@ -32,7 +30,6 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
-      - run: npm install # Ensure dependencies are available in dist for publish
       - run: npm publish --access public
         working-directory: dist # Only the publish step should use working-directory: dist
         env:
