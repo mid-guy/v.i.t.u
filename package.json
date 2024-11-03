@@ -1,7 +1,8 @@
 {
 	"name": "@mg/babel-plugin-v.i.t.u",
 	"version": "1.0.0",
-	"description": "A Babel plugin that converts `r-if` JSX attributes to conditional expressions for React components.",
+	"description": "A Babel plugin that converts `r-if` like Vue.js JSX attributes to conditional expressions for React components.",
+	"type": "module",
 	"main": "dist/index.js",
 	"type": "module",
 	"files": [
@@ -17,20 +18,18 @@
 		"jsx",
 		"r-if",
 		"react",
-		"compiler",
+		"react-compiler",
 		"babel-plugin"
 	],
 	"author": "mid-guy",
 	"license": "MIT",
-	"dependencies": {
+	"devDependencies": {
+		"rollup-plugin-copy": "^3.5.0",
 		"@babel/core": "^7.26.0",
 		"@babel/preset-env": "^7.26.0",
 		"@rollup/plugin-babel": "^6.0.4",
 		"@rollup/plugin-commonjs": "^28.0.1",
 		"@rollup/plugin-node-resolve": "^15.3.0",
 		"rollup": "^4.24.3"
-	},
-	"devDependencies": {
-		"rollup-plugin-copy": "^3.5.0"
 	}
 }
