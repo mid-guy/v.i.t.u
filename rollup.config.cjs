@@ -25,7 +25,11 @@ module.exports = {
 			presets: ['@babel/preset-env'],
 		}),
 		copy({
-			targets: [{ src: 'src/types.d.ts', dest: 'dist' }],
+			targets: [
+				{ src: 'src/types.d.ts', dest: 'dist' },
+				{ src: 'package.json', dest: 'dist' }, // Copy package.json to dist
+				{ src: 'README.md', dest: 'dist' }, // Optional: copy README for npm
+			],
 		}),
 	],
 };
