@@ -20,14 +20,7 @@ jobs:
         with:
           node-version: '20'
       - run: npm install
-      - run: npm run build
-      - name: Verify `dist` Directory Contents
-        run: ls -la dist # Check if `dist` directory is created
-      - name: Upload `dist` as Artifact
-        uses: actions/upload-artifact@v3
-        with:
-          name: dist-artifact
-          path: dist
+      - run: npm run build # Run build from the root directory (no working-directory here)
 
   publish:
     needs: build
@@ -39,14 +32,8 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://registry.npmjs.org/'
-      - name: Download `dist` Artifact
-        uses: actions/download-artifact@v3
-        with:
-          name: dist-artifact
-          path: dist # This sets up the `dist` folder in the working directory
-      - run: npm install
-      - name: Publish to NPM
-        run: npm publish --access public
-        working-directory: dist
+      - run: npm install # Ensure dependencies are available in dist for publish
+      - run: npm publish --access public
+        working-directory: dist # Only the publish step should use working-directory: dist
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
