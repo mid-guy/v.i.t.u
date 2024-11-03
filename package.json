@@ -11,7 +11,8 @@
 	},
 	"scripts": {
 		"build": "npm run clean && rollup -c",
-		"prepare": "npm run build"
+		"prepare": "npm run build",
+		"clean": "rm -rf dist"
 	},
 	"keywords": [
 		"jsx",

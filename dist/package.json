@@ -2,20 +2,17 @@
 	"name": "@mg/babel-plugin-v.i.t.u",
 	"version": "1.0.0",
 	"description": "A Babel plugin that converts `r-if` JSX attributes to conditional expressions for React components.",
-	"main": "dist/index.js",
 	"type": "module",
-	"files": [
-		"dist",
-		"scripts/types.d.ts"
-	],
+	"main": "dist/index.js",
+	"types": "dist/types.d.ts",
 	"repository": {
 		"type": "git",
 		"url": "https://github.com/mid-guy/v.i.t.u"
 	},
-	"types": "dist/types.d.ts",
 	"scripts": {
-		"build": "rollup -c",
-		"prepare": "npm run build"
+		"build": "npm run clean && rollup -c",
+		"prepare": "npm run build",
+		"clean": "rm -rf dist"
 	},
 	"keywords": [
 		"jsx",
