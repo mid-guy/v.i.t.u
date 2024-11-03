@@ -1,5 +1,5 @@
 {
-	"name": "@mg/babel-plugin-v.i.t.u",
+	"name": "babel-plugin-v.i.t.u",
 	"version": "1.0.0",
 	"description": "A Babel plugin that converts `r-if` JSX attributes to conditional expressions for React components.",
 	"type": "module",
