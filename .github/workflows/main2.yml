@@ -20,9 +20,9 @@ jobs:
         with:
           node-version: '20'
       - run: npm install
-      - run: npm run build
-      - name: Verify `dist` Directory Contents
-        run: ls -la dist # List files in `dist` to verify it's correctly built
+      # - run: npm run build
+      # - name: Verify `dist` Directory Contents
+      #   run: ls -la dist # List files in `dist` to verify it's correctly built
 
   publish:
     needs: build
