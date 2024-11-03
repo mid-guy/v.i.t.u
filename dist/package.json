@@ -7,11 +7,13 @@
 	"types": "dist/types.d.ts",
 	"repository": {
 		"type": "git",
-		"url": "https://github.com/mid-guy/v.i.t.u"
+		"url": "git+https://github.com/mid-guy/v.i.t.u.git"
+	},
+	"publishConfig": {
+		"access": "public"
 	},
 	"scripts": {
 		"build": "npm run clean && rollup -c",
-		"prepare": "npm run build",
 		"clean": "rm -rf dist"
 	},
 	"keywords": [
