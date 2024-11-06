@@ -1,6 +1,6 @@
 {
 	"name": "babel-plugin-v.i.t.u",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "A Babel plugin that converts `r-if` like Vue.js JSX attributes to conditional expressions for React components.",
 	"type": "module",
 	"main": "dist/index.js",
