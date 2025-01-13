@@ -24,7 +24,8 @@ module.exports = {
 					options: {
 						presets: ['@babel/preset-env', '@babel/preset-react'],
 						// plugins: ['@mg/babel-plugin-v.i.t.u'],
-						plugins: ['./babel-plugin-transform-r-if.js'],
+						// plugins: ['./babel-plugin-transform-r-if.js'],
+						plugins: ['../../scripts/index.cjs'],
 					},
 				},
 			},
