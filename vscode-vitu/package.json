@@ -1,0 +1,34 @@
+{
+	"name": "vitu-language-features",
+	"displayName": "V.I.T.U Language Features",
+	"description": "IntelliSense, hover, go-to-definition and diagnostics inside r-for/v-for string directives in JSX/TSX.",
+	"version": "0.0.1",
+	"publisher": "mid-guy",
+	"engines": {
+		"vscode": "^1.80.0"
+	},
+	"categories": ["Programming Languages"],
+	"main": "./extension.js",
+	"activationEvents": [
+		"onLanguage:javascriptreact",
+		"onLanguage:typescriptreact",
+		"onLanguage:javascript",
+		"onLanguage:typescript"
+	],
+	"contributes": {
+		"configurationDefaults": {
+			"[javascriptreact]": {
+				"editor.quickSuggestions": { "strings": "on" }
+			},
+			"[typescriptreact]": {
+				"editor.quickSuggestions": { "strings": "on" }
+			}
+		}
+	},
+	"scripts": {
+		"test": "node test/run.js"
+	},
+	"dependencies": {
+		"typescript": "^5.5.0"
+	}
+}
