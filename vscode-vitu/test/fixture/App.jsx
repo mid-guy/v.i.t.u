@@ -3,8 +3,9 @@ export default function App() {
 	const items = [{ id: 1, label: 'one' }];
 	return (
 		<div>
-			<p r-for="text from texts">{'row'}</p>
-			<span r-for="item of itemz">{'row'}</span>
+			<p r-for="(text, ti) from texts">{'row'}</p>
+			<span r-for="(item, ii) of itemz">{'row'}</span>
+			<li r-for="(entry, i) in items">{entry.label}</li>
 		</div>
 	);
 }

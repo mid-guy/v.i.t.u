@@ -7,7 +7,9 @@
 	"engines": {
 		"vscode": "^1.80.0"
 	},
-	"categories": ["Programming Languages"],
+	"categories": [
+		"Programming Languages"
+	],
 	"main": "./extension.js",
 	"activationEvents": [
 		"onLanguage:javascriptreact",
@@ -16,12 +18,22 @@
 		"onLanguage:typescript"
 	],
 	"contributes": {
+		"typescriptServerPlugins": [
+			{
+				"name": "typescript-vitu-plugin",
+				"enableForWorkspaceTypeScriptVersions": true
+			}
+		],
 		"configurationDefaults": {
 			"[javascriptreact]": {
-				"editor.quickSuggestions": { "strings": "on" }
+				"editor.quickSuggestions": {
+					"strings": "on"
+				}
 			},
 			"[typescriptreact]": {
-				"editor.quickSuggestions": { "strings": "on" }
+				"editor.quickSuggestions": {
+					"strings": "on"
+				}
 			}
 		}
 	},
@@ -29,6 +41,11 @@
 		"test": "node test/run.js"
 	},
 	"dependencies": {
-		"typescript": "^5.5.0"
+		"typescript": "^5.5.0",
+		"typescript-vitu-plugin": "link:typescript-vitu-plugin"
+	},
+	"devDependencies": {
+		"@types/react": "^19.2.17",
+		"react": "^19.2.7"
 	}
 }

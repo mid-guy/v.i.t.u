@@ -1,0 +1,6 @@
+{
+	"name": "typescript-vitu-plugin",
+	"version": "0.0.1",
+	"description": "tsserver plugin: mutes built-in 'any' hovers and unresolved-name noise inside V.I.T.U r-for elements.",
+	"main": "index.js"
+}
