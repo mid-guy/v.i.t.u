@@ -1,0 +1,23 @@
+{
+	"version": "0.2.0",
+	"configurations": [
+		{
+			"name": "Run Extension (vscode-vitu)",
+			"type": "extensionHost",
+			"request": "launch",
+			"args": [
+				"--extensionDevelopmentPath=${workspaceFolder}/vscode-vitu",
+				"${workspaceFolder}/vscode-vitu/example",
+				"${workspaceFolder}/vscode-vitu/example/App.jsx"
+			]
+		},
+		{
+			"name": "Run Smoke Tests (vscode-vitu)",
+			"type": "node",
+			"request": "launch",
+			"program": "${workspaceFolder}/vscode-vitu/test/run.js",
+			"cwd": "${workspaceFolder}/vscode-vitu",
+			"console": "integratedTerminal"
+		}
+	]
+}

@@ -1,8 +1,68 @@
+// Matches `(item, index) in items` (also of/from keywords).
+const RFOR_RE =
+	/^\s*\(\s*([A-Za-z_$][\w$]*)\s*,\s*([A-Za-z_$][\w$]*)\s*\)\s+(?:in|of|from)\s+([\s\S]+?)\s*$/;
+
 class DirectiveHandler {
-	constructor(t, path) {
+	constructor(t, template, path) {
 		this.t = t;
+		this.template = template;
 		this.path = path;
 		this.node = path.node;
+	}
+
+	handleRFor() {
+		const rForAttr = this._findAttr('r-for');
+		if (!rForAttr) return false;
+
+		const raw =
+			rForAttr.value && rForAttr.value.type === 'StringLiteral'
+				? rForAttr.value.value
+				: null;
+		if (raw === null) {
+			throw this.path.buildCodeFrameError(
+				'r-for expects a string value, e.g. r-for="(item, index) in items"'
+			);
+		}
+
+		const match = raw.match(RFOR_RE);
+		if (!match) {
+			throw this.path.buildCodeFrameError(
+				`Invalid r-for expression "${raw}". Expected "(item, index) in items".`
+			);
+		}
+		const [, itemName, indexName, source] = match;
+
+		this._removeAttr(rForAttr);
+
+		const indexId = this.t.identifier(indexName);
+
+		if (!this._findAttr('key')) {
+			this.node.openingElement.attributes.push(
+				this.t.jSXAttribute(
+					this.t.jSXIdentifier('key'),
+					this.t.jSXExpressionContainer(this.t.cloneNode(indexId))
+				)
+			);
+		}
+
+		const sourceExpr = this.template.expression.ast(source);
+		const mapCall = this.t.callExpression(
+			this.t.memberExpression(sourceExpr, this.t.identifier('map')),
+			[
+				this.t.arrowFunctionExpression(
+					[this.t.identifier(itemName), indexId],
+					this.node
+				),
+			]
+		);
+
+		const parent = this.path.parentPath;
+		this.path.replaceWith(
+			parent && (parent.isJSXElement() || parent.isJSXFragment())
+				? this.t.jSXExpressionContainer(mapCall)
+				: mapCall
+		);
+		return true;
 	}
 
 	handleRIf() {
@@ -29,7 +89,8 @@ class DirectiveHandler {
 			this._removeAttr(
 				elsePath.node.openingElement.attributes.find(
 					(attr) => attr.name && attr.name.name === 'r-else'
-				)
+				),
+				elsePath.node
 			);
 			siblings
 				.slice(0, siblings.indexOf(elseElement))
@@ -81,9 +142,10 @@ class DirectiveHandler {
 		);
 	}
 
-	_removeAttr(attr) {
-		this.node.openingElement.attributes =
-			this.node.openingElement.attributes.filter((a) => a !== attr);
+	_removeAttr(attr, node = this.node) {
+		node.openingElement.attributes = node.openingElement.attributes.filter(
+			(a) => a !== attr
+		);
 	}
 
 	_mergeStyle(styleProperty) {
@@ -104,12 +166,12 @@ class DirectiveHandler {
 	}
 }
 
-module.exports = function ({ types: t }) {
+module.exports = function ({ types: t, template }) {
 	return {
 		visitor: {
 			JSXElement(path) {
-				const handler = new DirectiveHandler(t, path);
-				handler.handleRIf() || handler.handleRShow();
+				const handler = new DirectiveHandler(t, template, path);
+				handler.handleRFor() || handler.handleRIf() || handler.handleRShow();
 			},
 		},
 	};
