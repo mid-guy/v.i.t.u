@@ -15,8 +15,18 @@ const v = buildVirtual(text);
 console.log('--- virtual document ---');
 console.log(v.text);
 assert(v.hasDirectives, 'directives detected');
-assert(v.text.includes('r-for={[...(texts)].map((text) => text)}'), 'r-for rewritten');
-assert(v.text.includes('r-for={[...(itemz)].map((item) => item)}'), 'second directive rewritten');
+assert(
+	v.text.includes("{[...(texts)].map((text, ti) => <p >{'row'}</p>)}"),
+	'r-for element wrapped whole'
+);
+assert(
+	v.text.includes("{[...(itemz)].map((item, ii) => <span >{'row'}</span>)}"),
+	'second directive rewritten'
+);
+assert(
+	v.text.includes('{[...(items)].map((entry, i) => <li >{entry.label}</li>)}'),
+	'third directive rewritten with children intact'
+);
 
 const service = createVituService(path.dirname(fixture));
 service.upsert(fixture, v.text, 1);
@@ -60,7 +70,7 @@ assert(names.includes('items'), "completion list includes 'items'");
 console.log('--- completions --- includes texts/items, total:', names.length);
 
 // 4. Hover on the item binding shows the inferred element type
-const itemPos = text.indexOf('"text from') + 1;
+const itemPos = text.indexOf('(text, ti)') + 1;
 const itemGenPos = srcOffsetToGen(v, itemPos + 1);
 const quickInfo = service.ls.getQuickInfoAtPosition(fixture, itemGenPos);
 assert(quickInfo, 'quick info returned');
@@ -68,6 +78,45 @@ const hover = ts.displayPartsToString(quickInfo.displayParts);
 console.log('--- hover on item ---');
 console.log(hover);
 assert(hover.includes('string'), 'item binding is inferred as string');
+
+// 4b. Hover on the (item, index) bindings: element type and number index
+const entryPos = text.indexOf('(entry, i) in') + '('.length;
+const entryInfo = service.ls.getQuickInfoAtPosition(
+	fixture,
+	srcOffsetToGen(v, entryPos + 1)
+);
+assert(entryInfo, 'quick info for entry returned');
+const entryHover = ts.displayPartsToString(entryInfo.displayParts);
+console.log('--- hover on entry ---');
+console.log(entryHover);
+assert(entryHover.includes('id'), 'entry binding infers the object element type');
+const idxPos = text.indexOf('(entry, i) in') + '(entry, '.length;
+const idxInfo = service.ls.getQuickInfoAtPosition(fixture, srcOffsetToGen(v, idxPos));
+assert(idxInfo, 'quick info for index returned');
+const idxHover = ts.displayPartsToString(idxInfo.displayParts);
+console.log('--- hover on index ---');
+console.log(idxHover);
+assert(idxHover.includes('number'), 'index binding is inferred as number');
+
+// 4c. Bindings are visible inside the element body: hover + member completion
+const bodyPos = text.indexOf('{entry.label}') + 2;
+const bodyInfo = service.ls.getQuickInfoAtPosition(fixture, srcOffsetToGen(v, bodyPos));
+assert(bodyInfo, 'quick info inside element body returned');
+const bodyHover = ts.displayPartsToString(bodyInfo.displayParts);
+console.log('--- hover on entry in body ---');
+console.log(bodyHover);
+assert(bodyHover.includes('id'), 'body binding infers the object element type');
+const dotPos = text.indexOf('entry.label') + 'entry.'.length;
+const bodyCompletions = service.ls.getCompletionsAtPosition(
+	fixture,
+	srcOffsetToGen(v, dotPos),
+	{}
+);
+assert(bodyCompletions, 'body completions returned');
+const bodyNames = bodyCompletions.entries.map((e) => e.name);
+assert(bodyNames.includes('label'), "body completion includes 'label'");
+assert(bodyNames.includes('id'), "body completion includes 'id'");
+console.log('--- body completions ---', bodyNames.join(', '));
 
 // 5. Cursor outside a directive maps to nothing (built-in TS takes over)
 assert(srcOffsetToGen(v, text.indexOf('const texts')) == null, 'outside positions unmapped');

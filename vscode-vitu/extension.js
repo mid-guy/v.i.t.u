@@ -140,27 +140,33 @@ function updateDecorations(editor) {
 			valueRanges.push(range(r.valueSrcStart, r.valueSrcEnd));
 			keywordRanges.push(range(r.keywordSrc, r.keywordSrc + r.keywordLen));
 		}
+		// Semantic colors from the virtual document, applied everywhere we own:
+		// the directive string and the element body, where the built-in TS
+		// semantic highlighter goes blind (unresolved loop bindings).
 		const fileName = document.uri.fsPath;
-		for (const s of v.segments) {
-			let classified;
-			try {
-				classified = service.ls.getEncodedSemanticClassifications(
-					fileName,
-					{ start: s.gen, length: s.len },
-					service.ts.SemanticClassificationFormat.TwentyTwenty
-				);
-			} catch {
-				continue;
-			}
+		let classified = null;
+		try {
+			classified = service.ls.getEncodedSemanticClassifications(
+				fileName,
+				{ start: 0, length: v.text.length },
+				service.ts.SemanticClassificationFormat.TwentyTwenty
+			);
+		} catch {
+			// stale document; decorations refresh on the next change
+		}
+		if (classified) {
 			const spans = classified.spans;
 			for (let i = 0; i < spans.length; i += 3) {
 				const genStart = spans[i];
 				const len = spans[i + 1];
-				if (genStart < s.gen || genStart + len > s.gen + s.len) continue;
+				const src = genOffsetToSrc(v, genStart);
+				if (src == null) continue;
+				if (!v.scopes.some((s) => src >= s.srcStart && src < s.srcEnd)) {
+					continue;
+				}
 				const type = TS_TOKEN_TYPES[(spans[i + 2] >> 8) - 1];
 				const bucket = tokenDecorations.findIndex((b) => b.types.includes(type));
 				if (bucket === -1) continue;
-				const src = s.src + (genStart - s.gen);
 				bucketRanges[bucket].push(range(src, src + len));
 			}
 		}
