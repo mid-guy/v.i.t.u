@@ -9,7 +9,12 @@
 
 const VALUE_RE =
 	/^\s*\(\s*[A-Za-z_$][\w$]*\s*,\s*[A-Za-z_$][\w$]*\s*\)\s+(?:from|of|in)\s+\S/;
-const DIRECTIVE_ATTR_RE = /^(?:r|v)-(?:if|else|show|for)$/;
+const DIRECTIVE_ATTR_RE = /^(?:r|v)-(?:if|else|show|for|slot)$/;
+
+// Prop-shape mismatches ("not assignable", "does not exist", "no overload")
+// raised on an r-slot element, where the children the author writes are a
+// render function only after the transform.
+const CHILDREN_PROP_CODES = new Set([2322, 2339, 2559, 2739, 2740, 2769]);
 
 function init({ typescript: ts }) {
 	function create(info) {
@@ -24,9 +29,21 @@ function init({ typescript: ts }) {
 		const collect = (sourceFile) => {
 			const scopes = [];
 			const mutedAttrs = [];
+			// Opening-tag ranges where "children"-shaped prop errors are ours:
+			// an r-slot element passes a render function the built-in server
+			// still sees as plain JSX children, and a component containing a
+			// <slot> outlet takes children its props type never declares.
+			const slotTags = [];
 			const visit = (node) => {
 				if (ts.isJsxElement(node) || ts.isJsxSelfClosingElement(node)) {
 					const opening = ts.isJsxElement(node) ? node.openingElement : node;
+					if (opening.tagName.getText(sourceFile) === 'slot') {
+						// A <slot> outlet: its data attributes are unknown props
+						// on HTMLSlotElement to the built-in server.
+						for (const p of opening.attributes.properties) {
+							mutedAttrs.push({ start: p.getStart(sourceFile), end: p.end });
+						}
+					}
 					for (const p of opening.attributes.properties) {
 						if (!ts.isJsxAttribute(p)) continue;
 						const name = p.name.getText(sourceFile);
@@ -40,12 +57,26 @@ function init({ typescript: ts }) {
 						) {
 							scopes.push({ start: node.getStart(sourceFile), end: node.end });
 						}
+						if (
+							/^(?:r|v)-slot$/.test(name) &&
+							p.initializer &&
+							ts.isStringLiteral(p.initializer) &&
+							p.initializer.text.trim()
+						) {
+							// The element body uses the slot bindings the built-in
+							// server cannot resolve.
+							scopes.push({ start: node.getStart(sourceFile), end: node.end });
+							slotTags.push({
+								start: opening.getStart(sourceFile),
+								end: opening.end,
+							});
+						}
 					}
 				}
 				ts.forEachChild(node, visit);
 			};
 			visit(sourceFile);
-			return { scopes, mutedAttrs };
+			return { scopes, mutedAttrs, slotTags };
 		};
 
 		const getSourceFile = (fileName) => {
@@ -87,12 +118,21 @@ function init({ typescript: ts }) {
 			const prior = ls.getSemanticDiagnostics(fileName);
 			const sourceFile = getSourceFile(fileName);
 			if (!sourceFile) return prior;
-			const { scopes, mutedAttrs } = collect(sourceFile);
+			const { scopes, mutedAttrs, slotTags } = collect(sourceFile);
 			if (!scopes.length && !mutedAttrs.length) return prior;
 			return prior.filter((d) => {
 				if (d.start == null) return true;
 				// Unknown-prop errors on the directive attributes themselves.
 				if (mutedAttrs.some((m) => d.start >= m.start && d.start < m.end)) {
+					return false;
+				}
+				// The render function an r-slot element passes is checked
+				// against the component's props by the vitu extension, on a
+				// virtual document where children is declared.
+				if (
+					CHILDREN_PROP_CODES.has(d.code) &&
+					slotTags.some((t) => d.start >= t.start && d.start < t.end)
+				) {
 					return false;
 				}
 				// "Cannot find name" (+ did-you-mean variant) on loop bindings.

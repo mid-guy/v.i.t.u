@@ -58,7 +58,8 @@ function getVirtual(document) {
 	const cached = virtualCache.get(key);
 	if (cached && cached.version === document.version) return cached.virtual;
 
-	const virtual = buildVirtual(document.getText());
+	const dialect = document.languageId.startsWith('typescript') ? 'ts' : 'js';
+	const virtual = buildVirtual(document.getText(), { dialect });
 	virtualCache.set(key, { version: document.version, virtual });
 
 	const fileName = document.uri.fsPath;
@@ -98,10 +99,16 @@ function refreshDiagnostics(document) {
 		...service.ls.getSemanticDiagnostics(fileName),
 	];
 	const result = [];
+	const seen = new Set();
 	for (const d of raw) {
 		if (d.start == null) continue;
 		const mapped = genRangeToSrc(v, d.start, d.start + (d.length || 1));
 		if (!mapped) continue;
+		// The slot-type capture replays r-for chains, so an error there can
+		// also surface from the primary copy; keep one.
+		const key = `${mapped.start}:${mapped.end}:${d.code}`;
+		if (seen.has(key)) continue;
+		seen.add(key);
 		const range = new vscode.Range(
 			document.positionAt(mapped.start),
 			document.positionAt(mapped.end)

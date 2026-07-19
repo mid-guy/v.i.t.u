@@ -157,6 +157,104 @@ dung directive và màu keyword `in`/`of`/`from` để đánh dấu "đây là D
 
 ---
 
+## #8 — Scoped slot: `<slot>` lấy `children` từ đâu (2026-07-19)
+
+**Chuyện gì xảy ra.** Thêm cặp directive scoped slot: `<slot item={row} />`
+bên trong component đẩy dữ liệu ra, `r-slot="{ item }"` phía gọi nhận về. Bản
+transform đầu lấy `children` bằng `path.getFunctionParent()` — và hỏng ngay khi
+outlet nằm trong `r-for`.
+
+**Tại sao sai.** Sau khi `handleRFor()` chạy, element đã bị bọc vào
+`.map((row, i) => ...)`. Function parent gần nhất của `<slot>` không còn là
+component nữa mà là **callback của `.map`**, params của nó là loop binding —
+`children` thành `row.children`. Cùng chuyện đó xảy ra với `.map()` viết tay.
+
+**Sửa như nào.** `_childrenRef()` leo tiếp chừng nào function cha còn là
+**argument của một CallExpression** (dấu hiệu của callback), rồi mới dừng ở
+component thật. Nếu component chưa destructure `children` thì chèn binding vào
+params — tác giả không phải khai báo gì.
+
+**Bài học.** Trong một visitor chạy nhiều directive trên cùng element, thứ tự
+transform là một phần của ngữ nghĩa: `getFunctionParent()` trả lời cho **AST
+sau khi đã sửa**, không phải AST tác giả viết. Đi tìm "component" thì phải mô
+tả được component khác callback ở chỗ nào.
+
+---
+
+## #9 — Type cho slot mà không bắt khai báo `children` (2026-07-19)
+
+**Chuyện gì xảy ra.** Slot chạy đúng lúc runtime, nhưng trong editor `item`
+của `r-slot="{ item }"` là `any`. Muốn có type thì bình thường phải bắt tác giả
+tự viết kiểu cho `children` — đúng thứ mà cả hai bên Vue lẫn directive này cố
+tránh.
+
+**Tại sao khó.** Kiểu của slot nằm ở **chỗ khác file khác** với nơi tiêu thụ nó:
+nó sinh ra từ các attribute trên `<slot>` bên trong component (và có thể nằm
+trong một hay nhiều `r-for` lồng nhau), còn nơi cần nó là thân element `r-slot`
+ở call site. Không có kênh nào sẵn để type đi từ chỗ này sang chỗ kia.
+
+**Sửa như nào.** Cho type đi nhờ **return type của component**. Trong virtual
+document: mỗi outlet sinh một const bắt kiểu, **replay lại đúng chuỗi `r-for`
+bao quanh** để các expression nhìn thấy loop binding
+(`const __vituS0 = [...(data)].map((entry, i) => ({ item: (entry), index: (i) }))[0]`);
+mọi `return` của component bọc trong `__vituCapture(jsx, __vituS0)` khai báo
+`J & { __vituSlots: S }`; phía call site, children thành render function có
+tham số `__VituSlots<typeof List>` — `.tsx` annotate thẳng, `.jsx` dùng JSDoc
+`@type`. Hai helper sống trong một `.d.ts` ảo do `lib/service.js` bơm vào.
+
+**Bài học.** Muốn type chảy qua ranh giới module thì phải gắn nó vào thứ
+TypeScript vốn đã mang qua ranh giới đó — ở đây là return type. Điều kiện duy
+nhất còn lại là props của component có kiểu (JSDoc hoặc TS), giống hệt vai trò
+của `defineProps` bên Vue.
+
+---
+
+## #10 — Slot qua `import`: virtual hóa cả file không mở (2026-07-19)
+
+**Chuyện gì xảy ra.** #9 chạy ngon khi component và call site **cùng một file**.
+Tách `List` ra `./Slots` rồi import vào là `item` trở lại `any`.
+
+**Tại sao sai.** Language service chỉ override nội dung của **file đang mở**;
+file import vào được đọc thẳng từ đĩa. Mà trên đĩa `List` vẫn còn `<slot>` và
+`r-for` — cú pháp mà TS không hiểu, và tuyệt nhiên không có `__vituCapture` nào
+để mang type ra. Return type của nó vô dụng.
+
+**Sửa như nào.** `getScriptSnapshot` chạy `buildVirtual` **lúc đọc file** cho
+mọi source file có dấu hiệu directive (`SCRIPT_EXT_RE` + `DIRECTIVE_HINT_RE`),
+lỗi thì rơi về nội dung gốc. Hai gạn lọc để rẻ: chỉ file script, và chỉ khi
+content khớp regex — file thường không trả giá gì.
+
+**Bài học.** "Virtual document" không phải là chuyện của riêng buffer đang mở.
+Hễ một type phải đi xuyên `import`, thì **mọi file trên đường đi** đều phải là
+bản virtual — nếu không, ranh giới module chính là chỗ type chết.
+
+---
+
+## #11 — Dọn nhiễu quanh slot: sai chỗ, sai lỗi, và lỗi trùng (2026-07-19)
+
+**Chuyện gì xảy ra.** Slot type đúng rồi thì lộ ba loại gạch đỏ giả: attribute
+trên `<slot>` bị TS chửi là prop lạ của `HTMLSlotElement`; element mang `r-slot`
+bị chửi prop không khớp; và một lỗi thật trong `r-slot` hiện **hai lần**.
+
+**Tại sao sai.** Ba nguyên nhân khác nhau, không gộp được:
+`<slot>` với TS built-in là web-component tag có sẵn; children của element
+`r-slot` chỉ là render function **sau transform**, trước đó vẫn là JSX thường
+nên không khớp props; còn lỗi trùng là do chính #9 — capture replay lại chuỗi
+`r-for`, nên một expression sai có **hai bản sinh** cùng map về một span nguồn.
+
+**Sửa như nào.** Trong `typescript-vitu-plugin`: mute toàn bộ attribute của
+`<slot>`, và lọc riêng nhóm code lỗi prop (2322/2339/2559/2739/2740/2769)
+**chỉ trong opening tag** của element có `r-slot`. Trong extension: dedupe
+diagnostics theo khóa `start:end:code` sau khi map về nguồn.
+
+**Bài học.** Sinh code có bản sao thì diagnostics cũng có bản sao — dedupe là
+phần bắt buộc của pipeline mapping, không phải chi tiết làm đẹp. Và mỗi lần
+chặn lỗi của TS built-in, phạm vi phải hẹp đến mức mô tả được bằng một câu
+("prop error, trong opening tag, của element có r-slot") — rộng hơn là bắt đầu
+nuốt lỗi thật.
+
+---
+
 ## Quy ước rút ra cho project
 
 1. **Verify bằng render thật**, không dừng ở so sánh code sinh ra (#1, #2).
@@ -166,5 +264,11 @@ dung directive và màu keyword `in`/`of`/`from` để đánh dấu "đây là D
 4. `any` bất thường → kiểm tra **module resolution trước, logic sau** (#5).
 5. Can thiệp TS built-in thì dùng **tsserver plugin**, can thiệp hẹp nhất có
    thể (#6).
-6. **Dùng pnpm** cho mọi thao tác cài đặt trong repo này.
-7. Việc còn treo: sửa `input` trong `rollup.config.cjs` và build lại `dist/`.
+6. Thứ tự transform là ngữ nghĩa: helper đi tìm node cha phải đúng với AST
+   **sau khi** các directive khác đã chạy (#8).
+7. Type đi xuyên `import` thì gắn vào **return type**, và virtual hóa mọi file
+   trên đường đi, không chỉ file đang mở (#9, #10).
+8. Sinh code có bản sao → **dedupe diagnostics** theo span nguồn; chặn lỗi TS
+   built-in thì phạm vi phải hẹp đến mức mô tả bằng một câu (#11).
+9. **Dùng pnpm** cho mọi thao tác cài đặt trong repo này.
+10. Việc còn treo: sửa `input` trong `rollup.config.cjs` và build lại `dist/`.
