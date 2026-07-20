@@ -1,11 +1,12 @@
 type User = { id: number; name: string };
 
+const users: User[] = [
+	{ id: 1, name: 'An' },
+	{ id: 2, name: 'Binh' },
+];
+const title = 'Danh sách';
+
 export default function App() {
-	const users: User[] = [
-		{ id: 1, name: 'An' },
-		{ id: 2, name: 'Binh' },
-	];
-	const title = 'Danh sách';
 
 	return (
 		<div>

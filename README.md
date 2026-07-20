@@ -85,6 +85,59 @@ const App = () => {
 export default App;
 ```
 
+## Scoped slots
+
+`<slot>` inside a component passes data outward; `r-slot` on the call site
+receives it — the Vue scoped-slot pattern, compiled to a React render prop.
+
+**Before compiler**
+
+```jsx
+function List({ rows }) {
+	return (
+		<ul>
+			<li r-for="(row, i) in rows">
+				<slot item={row} index={i}>{'nothing passed'}</slot>
+			</li>
+		</ul>
+	);
+}
+
+<List rows={rows} r-slot="{ item, index }">
+	<b>{index} - {item.label}</b>
+</List>;
+```
+
+**After compile**
+
+```jsx
+function List({ children, rows }) {
+	return (
+		<ul>
+			{rows.map((row, i) => (
+				<li key={i}>
+					{typeof children === 'function'
+						? children({ item: row, index: i })
+						: <>{'nothing passed'}</>}
+				</li>
+			))}
+		</ul>
+	);
+}
+
+<List rows={rows}>
+	{({ item, index }) => <><b>{index} - {item.label}</b></>}
+</List>;
+```
+
+The `children` binding is added to the component's props when the author has
+not destructured it. A `<slot>` with no matching `r-slot` renders its own
+children as fallback (or nothing).
+
+The VSCode extension in [`vscode-vitu/`](vscode-vitu/) types these slots with
+no annotation on `children`: hovering `item` shows the element type of `rows`,
+and a wrong property is flagged.
+
 ## Changelog
 
 All notable changes to this project will be documented here.

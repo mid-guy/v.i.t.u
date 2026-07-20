@@ -146,4 +146,124 @@ for (let i = 0; i < classified.spans.length; i += 3) {
 console.log('--- expr classifications ---', kinds);
 assert(kinds.includes('variable'), "expr 'texts' classified as variable");
 
+// 7. Scoped slots: <slot> outlets type the r-slot bindings with no
+// annotation from the author, in the same file and across imports.
+function slotCase(file, dialect) {
+	const src = fs.readFileSync(file, 'utf8');
+	const virtual = buildVirtual(src, { dialect });
+	const svc = createVituService(path.dirname(file));
+	svc.upsert(file, virtual.text, 1);
+	const diags = [];
+	for (const d of [
+		...svc.ls.getSyntacticDiagnostics(file),
+		...svc.ls.getSemanticDiagnostics(file),
+	]) {
+		if (d.start == null) continue;
+		const m = genRangeToSrc(virtual, d.start, d.start + (d.length || 1));
+		if (!m) continue;
+		diags.push({
+			message: ts.flattenDiagnosticMessageText(d.messageText, ' '),
+			sourceText: src.slice(m.start, m.end),
+		});
+	}
+	const hover = (needle, off) => {
+		const gen = srcOffsetToGen(virtual, src.indexOf(needle) + off);
+		assert(gen != null, `position inside slot body maps: ${needle}`);
+		const info = svc.ls.getQuickInfoAtPosition(file, gen);
+		assert(info, `quick info returned: ${needle}`);
+		return ts.displayPartsToString(info.displayParts);
+	};
+	const members = (needle) => {
+		const gen = srcOffsetToGen(virtual, src.indexOf(needle) + needle.length);
+		const info = svc.ls.getCompletionsAtPosition(file, gen, {});
+		return info ? info.entries.map((e) => e.name) : [];
+	};
+	return { src, virtual, diags, hover, members };
+}
+
+const jsSlot = slotCase(path.join(__dirname, 'fixture', 'Slot.jsx'), 'js');
+console.log('--- slot virtual (js) ---');
+console.log(jsSlot.virtual.text);
+assert(
+	jsSlot.virtual.text.includes(
+		'const __vituS0 = [...(data)].map((entry, i) => ({ item: (entry), index: (i), }))[0];'
+	),
+	'outlet capture replays the enclosing r-for scope'
+);
+assert(
+	jsSlot.virtual.text.includes('__vituCapture(('),
+	'component returns are wrapped so the slot type rides out'
+);
+assert(
+	jsSlot.virtual.text.includes(
+		'@type {(s: __VituSlots<typeof Local>) => any}'
+	),
+	'r-slot children become a typed render function'
+);
+
+const localItemHover = jsSlot.hover('item.label', 1);
+console.log('--- hover slot binding (js, same file) ---');
+console.log(localItemHover);
+assert(
+	localItemHover.includes('id') && localItemHover.includes('label'),
+	'slot binding is typed from the <slot> outlet, with no children annotation'
+);
+assert(
+	jsSlot.hover('<i>{index}</i>', '<i>{i'.length).includes('number'),
+	'slot index binding is typed from the outlet expression'
+);
+assert.deepStrictEqual(
+	jsSlot.members('item.').sort(),
+	['id', 'label'],
+	'slot binding completes its members'
+);
+const importedHover = jsSlot.hover('{item.label}</b>\n\t\t\t</List>', 2);
+console.log('--- hover slot binding (js, imported component) ---');
+console.log(importedHover);
+assert(
+	importedHover.includes('label'),
+	'slot types flow across imports (List from ./Slots)'
+);
+console.log('--- slot diagnostics (js) ---', jsSlot.diags);
+assert(
+	jsSlot.diags.some(
+		(d) => d.sourceText === 'nope' && d.message.includes("Property 'nope'")
+	),
+	'a wrong member on a slot binding is reported'
+);
+assert(
+	!jsSlot.diags.some((d) => d.message.includes("'children'")),
+	'the injected children prop never surfaces as a user error'
+);
+
+const tsSlot = slotCase(path.join(__dirname, 'fixture', 'Slot.tsx'), 'ts');
+assert(
+	tsSlot.virtual.text.includes('__VituSlots<typeof Table>) =>'),
+	'the .tsx dialect annotates the render function directly'
+);
+const cellHover = tsSlot.hover('cell.label', 1);
+console.log('--- hover slot binding (tsx) ---');
+console.log(cellHover);
+assert(cellHover.includes('Row'), 'tsx slot binding resolves to the Row type');
+assert(
+	tsSlot.hover('{index}</td>', 1).includes('number'),
+	'tsx slot index binding is a number'
+);
+console.log('--- slot diagnostics (tsx) ---', tsSlot.diags);
+assert(
+	tsSlot.diags.some(
+		(d) => d.sourceText === 'missing' && d.message.includes("Property 'missing'")
+	),
+	'tsx reports a wrong member on the slot binding'
+);
+assert(
+	!tsSlot.diags.some((d) => d.message.includes("'children'")),
+	'tsx children glue stays invisible'
+);
+
+// 8. A file with no directives is untouched.
+const plain = buildVirtual('export const a = 1;\n');
+assert(!plain.hasDirectives, 'plain file reports no directives');
+assert.strictEqual(plain.text, 'export const a = 1;\n', 'plain file unchanged');
+
 console.log('\nAll checks passed.');
