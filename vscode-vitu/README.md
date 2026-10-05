@@ -78,12 +78,14 @@ mở sẵn `example/App.jsx` để nghịch.
 
 ## Debug
 
-Mở thư mục `vscode-vitu` (không phải thư mục gốc của repo) để VSCode đọc được
+Mở thư mục `vscode-vitu` hoặc thư mục gốc của repo đều được — cả hai đều có
 `.vscode/launch.json`. Trong panel **Run and Debug** có hai cấu hình:
 
-- **Run Extension** — mở Extension Development Host kèm `example/App.jsx`;
-  đặt breakpoint trong `extension.js` hoặc `lib/` là dừng được.
-- **Debug Tests** — chạy `test/run.js` dưới debugger của VSCode.
+- **Run Extension** (ở gốc repo: **Run Extension (vscode-vitu)**) — mở Extension
+  Development Host kèm `example/App.jsx`; đặt breakpoint trong `extension.js`
+  hoặc `lib/` là dừng được.
+- **Debug Tests** (ở gốc repo: **Run Smoke Tests (vscode-vitu)**) — chạy
+  `test/run.js` dưới debugger của VSCode.
 
 Debug test từ terminal, không cần VSCode:
 
