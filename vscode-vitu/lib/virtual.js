@@ -38,6 +38,7 @@ function collectDirectives(text) {
 		ts.ScriptKind.TSX
 	);
 	const directives = [];
+	const shows = [];
 	const mutes = [];
 	const rslots = [];
 	const outlets = []; // raw <slot> outlets, grouped into slotFns below
