@@ -4,7 +4,7 @@ const commonjs = require('@rollup/plugin-commonjs');
 const copy = require('rollup-plugin-copy');
 
 module.exports = {
-	input: 'scripts/index.js',
+	input: 'scripts/index.cjs',
 	output: [
 		{
 			file: 'dist/index.js', // ES module
@@ -14,6 +14,7 @@ module.exports = {
 		{
 			file: 'dist/index.cjs', // CommonJS
 			format: 'cjs',
+			exports: 'default',
 			sourcemap: true,
 		},
 	],
@@ -22,15 +23,10 @@ module.exports = {
 		commonjs(),
 		babel({
 			babelHelpers: 'bundled',
-			presets: ['@babel/preset-env'],
+			presets: [['@babel/preset-env', { targets: { node: '18' } }]],
 		}),
 		copy({
-			targets: [
-				{ src: 'src/types.d.ts', dest: 'dist' },
-				{ src: 'package.json', dest: 'dist' },
-				{ src: 'README.md', dest: 'dist' },
-				{ src: 'rollup.config.js', dest: 'dist' }, // Copy rollup.config.js to dist
-			],
+			targets: [{ src: 'scripts/types.d.ts', dest: 'dist' }],
 		}),
 	],
 };

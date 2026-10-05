@@ -1,37 +1,70 @@
 {
 	"name": "babel-plugin-v.i.t.u",
 	"version": "1.0.0",
-	"description": "A Babel plugin that converts `r-if` like Vue.js JSX attributes to conditional expressions for React components.",
+	"description": "Vue-style directives for React JSX: r-if, r-else, r-show, r-for and scoped slots, compiled away by Babel.",
 	"type": "module",
-	"main": "dist/index.js",
+	"main": "dist/index.cjs",
+	"module": "dist/index.js",
 	"types": "dist/types.d.ts",
+	"exports": {
+		".": {
+			"types": "./dist/types.d.ts",
+			"import": "./dist/index.js",
+			"require": "./dist/index.cjs"
+		},
+		"./types": {
+			"types": "./dist/types.d.ts"
+		},
+		"./package.json": "./package.json"
+	},
+	"files": [
+		"dist"
+	],
 	"repository": {
 		"type": "git",
 		"url": "git+https://github.com/mid-guy/v.i.t.u.git"
+	},
+	"homepage": "https://github.com/mid-guy/v.i.t.u#readme",
+	"bugs": {
+		"url": "https://github.com/mid-guy/v.i.t.u/issues"
 	},
 	"publishConfig": {
 		"access": "public"
 	},
 	"scripts": {
 		"build": "npm run clean && rollup -c",
-		"clean": "rm -rf dist"
+		"clean": "rm -rf dist",
+		"test": "node --test scripts/_tests_/*.test.js",
+		"prepublishOnly": "npm test && npm run build"
 	},
 	"keywords": [
+		"babel-plugin",
 		"jsx",
-		"r-if",
 		"react",
-		"react-compiler",
-		"babel-plugin"
+		"vue",
+		"directives",
+		"r-if",
+		"r-else",
+		"r-show",
+		"r-for",
+		"scoped-slots"
 	],
 	"author": "mid-guy",
 	"license": "MIT",
+	"engines": {
+		"node": ">=18"
+	},
+	"peerDependencies": {
+		"@babel/core": "^7.0.0"
+	},
 	"devDependencies": {
-		"rollup-plugin-copy": "^3.5.0",
 		"@babel/core": "^7.26.0",
+		"@babel/plugin-syntax-jsx": "^7.29.7",
 		"@babel/preset-env": "^7.26.0",
 		"@rollup/plugin-babel": "^6.0.4",
 		"@rollup/plugin-commonjs": "^28.0.1",
 		"@rollup/plugin-node-resolve": "^15.3.0",
-		"rollup": "^4.24.3"
+		"rollup": "^4.24.3",
+		"rollup-plugin-copy": "^3.5.0"
 	}
 }
