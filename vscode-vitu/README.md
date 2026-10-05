@@ -76,6 +76,24 @@ pnpm test          # smoke test phần lõi, không cần VSCode
 Mở thư mục `vscode-vitu` trong VSCode rồi nhấn **F5** → Extension Development Host
 mở sẵn `example/App.jsx` để nghịch.
 
+## Debug
+
+Mở thư mục `vscode-vitu` (không phải thư mục gốc của repo) để VSCode đọc được
+`.vscode/launch.json`. Trong panel **Run and Debug** có hai cấu hình:
+
+- **Run Extension** — mở Extension Development Host kèm `example/App.jsx`;
+  đặt breakpoint trong `extension.js` hoặc `lib/` là dừng được.
+- **Debug Tests** — chạy `test/run.js` dưới debugger của VSCode.
+
+Debug test từ terminal, không cần VSCode:
+
+```bash
+pnpm test:debug    # node --inspect-brk, dừng ở dòng đầu chờ debugger gắn vào
+```
+
+Sau đó mở `chrome://inspect` trong Chrome, hoặc dùng lệnh
+**Debug: Attach to Node Process** của VSCode.
+
 ## Kiến trúc
 
 - `lib/virtual.js` — dùng parser của TypeScript tìm element mang directive, bọc cả

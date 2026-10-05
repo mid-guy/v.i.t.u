@@ -38,7 +38,8 @@
 		}
 	},
 	"scripts": {
-		"test": "node test/run.js"
+		"test": "node test/run.js",
+		"test:debug": "node --inspect-brk test/run.js"
 	},
 	"dependencies": {
 		"typescript": "^5.5.0",
