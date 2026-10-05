@@ -56,12 +56,7 @@ class DirectiveHandler {
 			]
 		);
 
-		const parent = this.path.parentPath;
-		this.path.replaceWith(
-			parent && (parent.isJSXElement() || parent.isJSXFragment())
-				? this.t.jSXExpressionContainer(mapCall)
-				: mapCall
-		);
+		this.path.replaceWith(this._asChild(mapCall));
 		return true;
 	}
 
@@ -72,46 +67,32 @@ class DirectiveHandler {
 		const condition = rIfAttr.value.expression;
 		this._removeAttr(rIfAttr);
 
+		// r-else pairs only with the element directly after r-if; whitespace
+		// between the two is allowed and dropped with the pairing.
 		const siblings = this.path.getAllNextSiblings();
-		const elseElement = siblings.find((sibling) => {
-			const el = sibling.node;
-			return (
-				el &&
-				el.openingElement &&
-				el.openingElement.attributes.some(
-					(attr) => attr.name && attr.name.name === 'r-else'
-				)
-			);
-		});
+		const nextIndex = siblings.findIndex(
+			(sibling) => !(sibling.isJSXText() && sibling.node.value.trim() === '')
+		);
+		const next = nextIndex === -1 ? null : siblings[nextIndex];
+		const elseAttr =
+			next && next.isJSXElement()
+				? next.node.openingElement.attributes.find(
+						(attr) => attr.name && attr.name.name === 'r-else'
+					)
+				: null;
 
-		if (elseElement) {
-			const elsePath = siblings[siblings.indexOf(elseElement)];
-			this._removeAttr(
-				elsePath.node.openingElement.attributes.find(
-					(attr) => attr.name && attr.name.name === 'r-else'
-				),
-				elsePath.node
-			);
-			siblings
-				.slice(0, siblings.indexOf(elseElement))
-				.forEach((s) => s.remove());
-
-			const conditionalExpression = this.t.conditionalExpression(
-				condition,
-				this.node,
-				elsePath.node
-			);
-
-			this.path.replaceWith(conditionalExpression);
-			elsePath.remove();
-		} else {
-			const conditionalExpression = this.t.conditionalExpression(
-				condition,
-				this.node,
-				this.t.nullLiteral()
-			);
-			this.path.replaceWith(conditionalExpression);
+		let alternate = this.t.nullLiteral();
+		if (elseAttr) {
+			this._removeAttr(elseAttr, next.node);
+			alternate = next.node;
+			siblings.slice(0, nextIndex + 1).forEach((s) => s.remove());
 		}
+
+		this.path.replaceWith(
+			this._asChild(
+				this.t.conditionalExpression(condition, this.node, alternate)
+			)
+		);
 		return true;
 	}
 
@@ -228,12 +209,7 @@ class DirectiveHandler {
 			fallback
 		);
 
-		const parent = this.path.parentPath;
-		this.path.replaceWith(
-			parent && (parent.isJSXElement() || parent.isJSXFragment())
-				? this.t.jSXExpressionContainer(expr)
-				: expr
-		);
+		this.path.replaceWith(this._asChild(expr));
 		return true;
 	}
 
@@ -293,6 +269,15 @@ class DirectiveHandler {
 			return this.t.identifier('children');
 		}
 		return null;
+	}
+
+	// An expression replacing a JSX child has to sit in an expression
+	// container, otherwise it prints as text: <div>ok ? <p /> : null</div>.
+	_asChild(expr) {
+		const parent = this.path.parentPath;
+		return parent && (parent.isJSXElement() || parent.isJSXFragment())
+			? this.t.jSXExpressionContainer(expr)
+			: expr;
 	}
 
 	_findAttr(names) {
