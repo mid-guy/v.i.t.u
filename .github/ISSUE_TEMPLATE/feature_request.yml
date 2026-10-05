@@ -1,0 +1,28 @@
+name: Feature request
+description: Propose a new directive or a change in behaviour
+labels: [enhancement]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What are you trying to do?
+      description: The JSX you find awkward to write today.
+    validations:
+      required: true
+  - type: textarea
+    id: syntax
+    attributes:
+      label: Proposed syntax
+      description: What you would like to write, and the Vue feature it mirrors if there is one.
+      render: jsx
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Expected compiled output
+      render: jsx
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered

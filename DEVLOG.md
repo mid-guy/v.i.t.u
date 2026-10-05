@@ -255,6 +255,32 @@ nuốt lỗi thật.
 
 ---
 
+## #12 — `r-if`/`r-else`: test đầu tiên lòi ra hai bug (2026-10-05)
+
+**Chuyện gì xảy ra.** Viết test cho plugin (`scripts/_tests_/`) thì hai case
+`r-if` cho output sai:
+
+- `<div><p r-if={ok}>yes</p></div>` ra `<div>ok ? <p>yes</p> : null</div>` —
+  đúng lỗi của #1, nhưng ở `handleRIf()`.
+- `<p r-if={a}/><p r-if={b}/><p r-else/>` ra `a ? … : <else>` và phần tử
+  `r-if={b}` **biến mất**.
+
+**Tại sao sai.** (1) #1 chỉ bọc `JSXExpressionContainer` cho `r-for`; `r-if`
+vẫn `replaceWith(conditionalExpression)` trần. Chạy chung pass với
+`preset-react` thì vẫn render đúng nên không ai thấy. (2) `handleRIf()` tìm
+`r-else` bằng `siblings.find(...)` — tức là `r-else` **đầu tiên ở bất kỳ đâu
+phía sau**, rồi xóa hết mọi sibling nằm giữa.
+
+**Sửa như nào.** Gom phần bọc container vào `_asChild()` dùng chung cho
+`r-for`, `r-if` và `<slot>`. `r-else` chỉ ghép với phần tử **ngay sau** `r-if`
+(bỏ qua text toàn whitespace); không phải thì nhánh còn lại là `null`.
+
+**Bài học.** Sửa một bug theo từng handler thì handler bên cạnh vẫn còn bug đó
+— sửa ở helper dùng chung. Và "render đúng" chưa đủ: output in ra cũng phải là
+JSX hợp lệ, vì plugin có thể chạy khác pass với JSX transform.
+
+---
+
 ## Quy ước rút ra cho project
 
 1. **Verify bằng render thật**, không dừng ở so sánh code sinh ra (#1, #2).
@@ -271,4 +297,6 @@ nuốt lỗi thật.
 8. Sinh code có bản sao → **dedupe diagnostics** theo span nguồn; chặn lỗi TS
    built-in thì phạm vi phải hẹp đến mức mô tả bằng một câu (#11).
 9. **Dùng pnpm** cho mọi thao tác cài đặt trong repo này.
-10. Việc còn treo: sửa `input` trong `rollup.config.cjs` và build lại `dist/`.
+10. Mỗi directive có test so output trong `scripts/_tests_/`; sửa bug thì
+    thêm test fail-trước-pass-sau (#12).
+11. `dist/` không commit — build lúc publish (`pnpm build`).
