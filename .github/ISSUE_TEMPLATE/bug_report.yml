@@ -1,0 +1,49 @@
+name: Bug report
+description: Something compiles or behaves differently from what the docs say
+labels: [bug]
+body:
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Babel plugin
+        - VSCode extension (vscode-vitu)
+        - Types
+        - Documentation
+    validations:
+      required: true
+  - type: textarea
+    id: input
+    attributes:
+      label: Code you wrote
+      description: The smallest JSX that shows the problem.
+      render: jsx
+    validations:
+      required: true
+  - type: textarea
+    id: actual
+    attributes:
+      label: What happened
+      description: The compiled output, the error message, or what the editor showed.
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version or commit
+      placeholder: 1.0.1, or a commit hash if you use main
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      description: Node, @babel/core and React versions; VSCode version for extension bugs.
+      placeholder: Node 22, @babel/core 7.26, React 18.3

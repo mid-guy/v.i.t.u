@@ -36,5 +36,7 @@ declare module 'react' {
     'r-show'?: boolean;
     /** Vue-like list rendering, e.g. r-for="(item, index) in items" */
     'r-for'?: string;
+    /** Receives scoped slot props, e.g. r-slot="{ item, index }" */
+    'r-slot'?: string;
   }
 }
