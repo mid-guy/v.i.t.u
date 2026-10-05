@@ -207,6 +207,16 @@ pnpm build    # bundle scripts/index.cjs into dist/
 
 See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 
+## Changelog
+
+The full history is in [CHANGELOG.md](CHANGELOG.md).
+
+- **Unreleased** (on `main`) — `r-else`, `r-show`, `r-for`, scoped slots
+  (`<slot>` / `r-slot`), the `vscode-vitu` extension, and fixes to how `r-if`
+  and `r-else` compile.
+- **1.0.1** (2024-11-06) — published to npm.
+- **1.0.0** (2024-11-03) — initial release with the `r-if` directive.
+
 ## Contributing
 
 Bug reports, ideas and pull requests are welcome. Please read
