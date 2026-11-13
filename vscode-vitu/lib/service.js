@@ -2,46 +2,53 @@
 
 const path = require('path');
 const ts = require('typescript');
-const { buildVirtual } = require('./virtual');
 
-// Ambient declarations every virtual document can rely on. __vituCapture
-// tags a component's return type with the captured slot-props type, and
-// __VituSlots reads it back on the consumer side (see lib/virtual.js).
+// Helpers the virtual documents call (see lib/virtual.js). They only exist
+// for the type checker. A rejected r-for source falls back to the
+// constraint, `any[]`, so the element body is not buried in follow-up errors.
 const AMBIENT_TEXT = `
-declare function __vituCapture<J, S>(jsx: J, slots: S): J & { __vituSlots: S };
-type __VituSlots<C> = C extends (props: any, ...rest: any[]) => infer R
-	? NonNullable<R> extends { __vituSlots: infer S } ? S : any
-	: any;
+declare function __vituFor<S extends readonly any[]>(source: S): S[number][];
+declare function __vituBool(value: boolean | undefined): {};
 `;
 const AMBIENT_NAME = '__vitu-ambient.d.ts';
 
-// Files that may carry directives and are cheap to detect by content.
-const SCRIPT_EXT_RE = /\.(?:jsx|tsx|js|ts|mjs|cjs)$/;
-const DIRECTIVE_HINT_RE = /(?:r|v)-(?:for|show|slot)\s*=|<slot[\s/>]/;
+const DEFAULT_OPTIONS = {
+	jsx: ts.JsxEmit.ReactJSX,
+	target: ts.ScriptTarget.ESNext,
+	module: ts.ModuleKind.ESNext,
+	moduleResolution: ts.ModuleResolutionKind.Bundler,
+	esModuleInterop: true,
+	skipLibCheck: true,
+};
+
+// The project's own compiler options (strict, paths, jsx, ...), so a
+// directive is checked by the same rules as the code around it. JS files are
+// always checked inside directives unless the config says `checkJs: false`.
+function loadCompilerOptions(rootDir) {
+	const configPath =
+		ts.findConfigFile(rootDir, ts.sys.fileExists, 'tsconfig.json') ||
+		ts.findConfigFile(rootDir, ts.sys.fileExists, 'jsconfig.json');
+	let options = DEFAULT_OPTIONS;
+	if (configPath) {
+		const { config } = ts.readConfigFile(configPath, ts.sys.readFile);
+		// Only the options are needed: skip scanning the project's files.
+		const host = { ...ts.sys, readDirectory: () => [] };
+		const parsed = ts.parseJsonConfigFileContent(
+			config || {},
+			host,
+			path.dirname(configPath)
+		);
+		options = { jsx: ts.JsxEmit.ReactJSX, ...parsed.options };
+	}
+	return { checkJs: true, ...options, allowJs: true, noEmit: true };
+}
 
 // A TypeScript LanguageService whose view of the world is the real filesystem,
-// except that (a) the open documents are overridden with their virtual
-// content, and (b) any other source file containing directives is virtualized
-// on read — so slot types flow across imports.
+// except that the open documents are overridden with their virtual content.
 function createVituService(rootDir) {
 	const docs = new Map(); // fileName -> { text, version }
 	const ambientPath = path.join(rootDir, AMBIENT_NAME);
-
-	const readSnapshot = (fn) => {
-		const content = ts.sys.readFile(fn);
-		if (content === undefined) return undefined;
-		if (SCRIPT_EXT_RE.test(fn) && DIRECTIVE_HINT_RE.test(content)) {
-			const dialect = /\.tsx?$/.test(fn) ? 'ts' : 'js';
-			try {
-				return ts.ScriptSnapshot.fromString(
-					buildVirtual(content, { dialect }).text
-				);
-			} catch {
-				// fall through to the raw content
-			}
-		}
-		return ts.ScriptSnapshot.fromString(content);
-	};
+	const options = loadCompilerOptions(rootDir);
 
 	const host = {
 		getScriptFileNames: () => [...docs.keys(), ambientPath],
@@ -53,19 +60,12 @@ function createVituService(rootDir) {
 			if (fn === ambientPath) return ts.ScriptSnapshot.fromString(AMBIENT_TEXT);
 			const d = docs.get(fn);
 			if (d) return ts.ScriptSnapshot.fromString(d.text);
-			return readSnapshot(fn);
+			const content = ts.sys.readFile(fn);
+			return content === undefined
+				? undefined
+				: ts.ScriptSnapshot.fromString(content);
 		},
-		getCompilationSettings: () => ({
-			allowJs: true,
-			checkJs: true,
-			noEmit: true,
-			jsx: ts.JsxEmit.ReactJSX,
-			target: ts.ScriptTarget.ESNext,
-			module: ts.ModuleKind.ESNext,
-			moduleResolution: ts.ModuleResolutionKind.Bundler,
-			esModuleInterop: true,
-			skipLibCheck: true,
-		}),
+		getCompilationSettings: () => options,
 		getDefaultLibFileName: (opts) => ts.getDefaultLibFilePath(opts),
 		getCurrentDirectory: () => rootDir,
 		fileExists: (fn) => fn === ambientPath || ts.sys.fileExists(fn),
@@ -83,7 +83,6 @@ function createVituService(rootDir) {
 		ts,
 		upsert: (fileName, text, version) => docs.set(fileName, { text, version }),
 		remove: (fileName) => docs.delete(fileName),
-		has: (fileName) => docs.has(fileName),
 	};
 }
 

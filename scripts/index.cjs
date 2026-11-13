@@ -64,12 +64,17 @@ class DirectiveHandler {
 		const rIfAttr = this._findAttr('r-if');
 		if (!rIfAttr) return false;
 
-		const condition = rIfAttr.value.expression;
+		const condition = this._expressionOf(rIfAttr, 'r-if');
 		this._removeAttr(rIfAttr);
 
-		// r-else pairs only with the element directly after r-if; whitespace
-		// between the two is allowed and dropped with the pairing.
-		const siblings = this.path.getAllNextSiblings();
+		// r-else pairs only with the element directly after r-if, both being
+		// JSX children; whitespace between the two is allowed and dropped
+		// with the pairing.
+		const parent = this.path.parentPath;
+		const siblings =
+			parent && (parent.isJSXElement() || parent.isJSXFragment())
+				? this.path.getAllNextSiblings()
+				: [];
 		const nextIndex = siblings.findIndex(
 			(sibling) => !(sibling.isJSXText() && sibling.node.value.trim() === '')
 		);
@@ -80,6 +85,7 @@ class DirectiveHandler {
 						(attr) => attr.name && attr.name.name === 'r-else'
 					)
 				: null;
+		if (elseAttr) this._checkRElse(elseAttr, next);
 
 		let alternate = this.t.nullLiteral();
 		if (elseAttr) {
@@ -100,7 +106,7 @@ class DirectiveHandler {
 		const rShowAttr = this._findAttr('r-show');
 		if (!rShowAttr) return false;
 
-		const condition = rShowAttr.value.expression;
+		const condition = this._expressionOf(rShowAttr, 'r-show');
 		this._removeAttr(rShowAttr);
 
 		const styleProperty = this.t.objectProperty(
@@ -116,159 +122,44 @@ class DirectiveHandler {
 		return true;
 	}
 
-	// Consumer side: `<List rows={rows} r-slot="{ item }">body</List>` turns
-	// the children into a render function taking the slot props.
-	//
-	//   <List rows={rows}>{({ item }) => <>body</>}</List>
-	handleRSlot() {
-		const rSlotAttr = this._findAttr(['r-slot', 'v-slot']);
-		if (!rSlotAttr) return false;
-
-		const raw =
-			rSlotAttr.value && rSlotAttr.value.type === 'StringLiteral'
-				? rSlotAttr.value.value.trim()
-				: null;
-		if (!raw) {
-			throw this.path.buildCodeFrameError(
-				'r-slot expects a string binding pattern, e.g. r-slot="{ item, index }"'
-			);
-		}
-
-		this._removeAttr(rSlotAttr);
-
-		let param;
-		try {
-			// The pattern is parsed as the parameter of a throwaway arrow.
-			param = this.template.expression.ast(`(${raw}) => 0`).params[0];
-		} catch {
-			throw this.path.buildCodeFrameError(
-				`Invalid r-slot pattern "${raw}". Expected "{ item, index }".`
-			);
-		}
-
-		const body = this.t.jSXFragment(
-			this.t.jSXOpeningFragment(),
-			this.t.jSXClosingFragment(),
-			this.node.children
+	// An r-else that is still on its element when the visitor gets there was
+	// not claimed by an r-if: paired ones are removed by handleRIf().
+	handleOrphanRElse() {
+		const rElseAttr = this._findAttr('r-else');
+		if (!rElseAttr) return;
+		this._checkRElse(rElseAttr, this.path);
+		throw this.path.buildCodeFrameError(
+			'r-else must directly follow an element with r-if (and that element cannot also carry r-for)'
 		);
-		this.node.children = [
-			this.t.jSXExpressionContainer(
-				this.t.arrowFunctionExpression([param], body)
-			),
-		];
-		return true;
 	}
 
-	// Component side: `<slot item={x} />` calls the children render function
-	// with the slot props, falling back to the outlet's own children.
-	//
-	//   {typeof children === 'function' ? children({ item: x }) : <>fallback</>}
-	handleSlot() {
-		const opening = this.node.openingElement;
-		if (!opening.name || opening.name.name !== 'slot') return false;
-
-		const props = [];
-		for (const attr of opening.attributes) {
-			if (attr.type === 'JSXSpreadAttribute') {
-				props.push(this.t.spreadElement(attr.argument));
-				continue;
-			}
-			if (!attr.name || attr.name.name === 'name') continue;
-			const key = attr.name.name;
-			const id = /^[A-Za-z_$][\w$]*$/.test(key)
-				? this.t.identifier(key)
-				: this.t.stringLiteral(key);
-			let value;
-			if (!attr.value) value = this.t.booleanLiteral(true);
-			else if (attr.value.type === 'JSXExpressionContainer')
-				value = attr.value.expression;
-			else value = attr.value;
-			props.push(this.t.objectProperty(id, value));
+	_checkRElse(attr, path) {
+		if (attr.value) {
+			throw path.buildCodeFrameError('r-else takes no value');
 		}
-
-		const children = this._childrenRef();
-		if (!children) return false; // no enclosing component to take children
-		const call = this.t.callExpression(this.t.cloneNode(children), [
-			this.t.objectExpression(props),
-		]);
-		const fallback = this.node.children.length
-			? this.t.jSXFragment(
-					this.t.jSXOpeningFragment(),
-					this.t.jSXClosingFragment(),
-					this.node.children
-				)
-			: this.t.nullLiteral();
-
-		const expr = this.t.conditionalExpression(
-			this.t.binaryExpression(
-				'===',
-				this.t.unaryExpression('typeof', this.t.cloneNode(children)),
-				this.t.stringLiteral('function')
-			),
-			call,
-			fallback
+		const hasRIf = path.node.openingElement.attributes.some(
+			(a) => a.name && a.name.name === 'r-if'
 		);
-
-		this.path.replaceWith(this._asChild(expr));
-		return true;
+		if (hasRIf) {
+			throw path.buildCodeFrameError(
+				'r-else and r-if cannot be used on the same element'
+			);
+		}
 	}
 
-	// How the enclosing component reaches its children render prop, adding
-	// the binding when the author destructured props without it.
-	_childrenRef() {
-		// The component, not a callback around the outlet: an r-for already
-		// transformed into `.map((row, i) => ...)` (or a hand-written .map)
-		// is a call argument, and its params are loop bindings.
-		let fnPath = this.path.getFunctionParent();
-		while (fnPath && fnPath.parentPath && fnPath.parentPath.isCallExpression()) {
-			fnPath = fnPath.getFunctionParent();
-		}
-		if (!fnPath) return null;
-
-		const params = fnPath.node.params;
-		if (!params.length) {
-			params.push(
-				this.t.objectPattern([
-					this.t.objectProperty(
-						this.t.identifier('children'),
-						this.t.identifier('children'),
-						false,
-						true
-					),
-				])
-			);
-			return this.t.identifier('children');
-		}
-
-		const first = params[0];
-		if (first.type === 'Identifier') {
-			return this.t.memberExpression(
-				this.t.identifier(first.name),
-				this.t.identifier('children')
+	// The expression of `name={expression}`; anything else is a mistake.
+	_expressionOf(attr, name) {
+		const value = attr.value;
+		if (
+			!value ||
+			value.type !== 'JSXExpressionContainer' ||
+			value.expression.type === 'JSXEmptyExpression'
+		) {
+			throw this.path.buildCodeFrameError(
+				`${name} expects an expression, e.g. ${name}={condition}`
 			);
 		}
-		if (first.type === 'ObjectPattern') {
-			for (const prop of first.properties) {
-				if (
-					prop.type === 'ObjectProperty' &&
-					prop.key &&
-					prop.key.name === 'children' &&
-					prop.value.type === 'Identifier'
-				) {
-					return this.t.identifier(prop.value.name);
-				}
-			}
-			first.properties.unshift(
-				this.t.objectProperty(
-					this.t.identifier('children'),
-					this.t.identifier('children'),
-					false,
-					true
-				)
-			);
-			return this.t.identifier('children');
-		}
-		return null;
+		return value.expression;
 	}
 
 	// An expression replacing a JSX child has to sit in an expression
@@ -280,10 +171,9 @@ class DirectiveHandler {
 			: expr;
 	}
 
-	_findAttr(names) {
-		names = Array.isArray(names) ? names : [names];
+	_findAttr(name) {
 		return this.node.openingElement.attributes.find(
-			(attr) => attr.name && names.includes(attr.name.name)
+			(attr) => attr.name && attr.name.name === name
 		);
 	}
 
@@ -297,7 +187,16 @@ class DirectiveHandler {
 		const existingStyleAttr = this._findAttr('style');
 
 		if (existingStyleAttr) {
-			existingStyleAttr.value.expression.properties.push(styleProperty);
+			const style = existingStyleAttr.value.expression;
+			if (style.type === 'ObjectExpression') {
+				style.properties.push(styleProperty);
+			} else {
+				// style={styles}: spread it so display is applied on top.
+				existingStyleAttr.value.expression = this.t.objectExpression([
+					this.t.spreadElement(style),
+					styleProperty,
+				]);
+			}
 		} else {
 			this.node.openingElement.attributes.push(
 				this.t.jSXAttribute(
@@ -316,8 +215,7 @@ module.exports = function ({ types: t, template }) {
 		visitor: {
 			JSXElement(path) {
 				const handler = new DirectiveHandler(t, template, path);
-				if (handler.handleSlot()) return;
-				handler.handleRSlot();
+				handler.handleOrphanRElse();
 				handler.handleRFor() || handler.handleRIf() || handler.handleRShow();
 			},
 		},

@@ -8,19 +8,19 @@ const App = () => {
 
 	return (
 		<div>
-			<h1>Chào mừng!</h1>
+			<h1>Welcome!</h1>
 			<ul>
 				<li r-for="(item, index) in items">
 					{parentMessage} - {index} - {item.message}
 				</li>
 			</ul>
 			<div>
-				<div r-if={isLoggedIn}>Bạn đã đăng nhập</div>
-				<div r-else>Vui lòng đăng nhập</div>
+				<div r-if={isLoggedIn}>You are signed in</div>
+				<div r-else>Please sign in</div>
 			</div>
-			<div r-show={isLoggedIn}>Thông tin tài khoản của bạn</div>
+			<div r-show={isLoggedIn}>Your account details</div>
 			<button onClick={toggleLogin}>
-				{isLoggedIn ? 'Đăng xuất' : 'Đăng nhập'}
+				{isLoggedIn ? 'Sign out' : 'Sign in'}
 			</button>
 		</div>
 	);

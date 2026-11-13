@@ -1,302 +1,442 @@
-# DEVLOG — nhật ký phát triển
+# DEVLOG — development diary
 
-Bám theo các mục trong [CHANGELOG.md](CHANGELOG.md). Mỗi mục ghi lại: chuyện gì
-xảy ra, **tại sao sai**, **sửa như nào**, và **bài học** rút ra.
-
----
-
-## #1 — Transform `r-for`: output là text chứ không phải expression (2026-07-16)
-
-**Chuyện gì xảy ra.** Bản đầu của `handleRFor()` trong `scripts/index.cjs` gọi
-`path.replaceWith(mapCall)` và tin rằng Babel sẽ tự lo phần còn lại. Kết quả
-compile ra `<ul>items.map(...)</ul>` — cả biểu thức `.map` thành **text node**
-nằm chình ình trong JSX.
-
-**Tại sao sai.** Babel không tự bọc expression vào `JSXExpressionContainer`
-khi node cha là JSX element. `replaceWith` làm đúng nghĩa đen: thay node này
-bằng node kia, còn hợp lệ hay không là việc của mình.
-
-**Sửa như nào.** Kiểm tra `path.parentPath`: nếu là `JSXElement`/`JSXFragment`
-thì bọc `mapCall` trong `t.jSXExpressionContainer(...)` trước khi thay.
-
-**Bài học.** Đừng chỉ nhìn AST output "trông có vẻ đúng" — phải render thật.
-Bài test quyết định là chạy `renderToStaticMarkup` qua react-dom/server và so
-HTML, chính nó bắt được lỗi này ngay lập tức.
+Follows the entries in [CHANGELOG.md](CHANGELOG.md). Each entry records what
+happened, **why it was wrong**, **how it was fixed**, and the **lesson**
+learned.
 
 ---
 
-## #2 — Bug `r-else` có sẵn: xóa attribute nhầm element (2026-07-16)
+## #1 — `r-for` transform: the output was text, not an expression (2026-07-16)
 
-**Chuyện gì xảy ra.** Khi verify `r-for` bằng render thật, React cảnh báo:
-`Received `true` for a non-boolean attribute `r-else``. Bug này tồn tại từ
-trước, không liên quan `r-for` — nhưng chỉ lộ ra khi render end-to-end.
+**What happened.** The first version of `handleRFor()` in `scripts/index.cjs`
+called `path.replaceWith(mapCall)` and trusted Babel to handle the rest. It
+compiled to `<ul>items.map(...)</ul>`: the whole `.map` expression became a
+**text node** sitting in the JSX.
 
-**Tại sao sai.** `_removeAttr(attr)` hard-code thao tác trên `this.node`
-(element mang `r-if`), trong khi attribute `r-else` cần xóa nằm trên **element
-anh em**. Hàm filter chạy êm, không ném lỗi — chỉ là không xóa được gì, và
-`r-else` đi thẳng ra DOM.
+**Why it was wrong.** Babel does not wrap an expression in a
+`JSXExpressionContainer` when the parent node is a JSX element. `replaceWith`
+does exactly what it says: it swaps one node for another, and whether the
+result is valid is up to you.
 
-**Sửa như nào.** Thêm tham số đích: `_removeAttr(attr, node = this.node)`, chỗ
-xử lý nhánh else truyền `elsePath.node` vào.
+**How it was fixed.** Check `path.parentPath`: if it is a
+`JSXElement`/`JSXFragment`, wrap `mapCall` in `t.jSXExpressionContainer(...)`
+before replacing.
 
-**Bài học.** Helper mặc định thao tác trên `this` là bẫy khi xử lý nhiều node
-cùng lúc. Và warning của React là tín hiệu thật, không phải noise — output
-render "trông đúng" nhưng console bẩn nghĩa là vẫn còn bug.
-
----
-
-## #3 — Chốt một format duy nhất `(item, index) in items` (2026-07-17)
-
-**Chuyện gì xảy ra.** Ban đầu hỗ trợ cả `item in items` lẫn
-`(item, index) in items` (index optional, tự sinh `_index` khi thiếu).
-Sau đó quyết định bỏ dạng trần, chỉ giữ dạng có ngoặc.
-
-**Tại sao đổi.** Hai cú pháp nghĩa là: hai nhánh regex, hai nhánh sinh code
-(uid `_index` vs identifier thật), hai bộ test — ở **cả hai nơi** (plugin Babel
-và extension VSCode), và chúng phải khớp nhau từng li. Mỗi lần thêm tính năng
-là sửa đôi. Một format bắt buộc làm regex đơn giản hơn, thông báo lỗi chỉ còn
-một câu, và loại luôn khả năng plugin/extension lệch cú pháp.
-
-**Bài học.** Với DSL tự thiết kế, "hỗ trợ nhiều cách viết" là nợ, không phải
-tiện. Khi cùng một cú pháp phải được parse ở nhiều tầng (compile + editor
-tooling), số biến thể nên là nhỏ nhất có thể.
+**Lesson.** Don't stop at an AST output that "looks right"; render it for
+real. The deciding test runs `renderToStaticMarkup` through react-dom/server
+and compares the HTML, and that is what caught this bug immediately.
 
 ---
 
-## #4 — Extension v1: hover trong thân element ra `any` (2026-07-17)
+## #2 — Existing `r-else` bug: the attribute was removed from the wrong element (2026-07-16)
 
-**Chuyện gì xảy ra.** Virtual document v1 chỉ viết lại **attribute**:
+**What happened.** While verifying `r-for` with a real render, React warned:
+`Received `true` for a non-boolean attribute `r-else``. The bug predates
+`r-for` and has nothing to do with it, but it only showed up in an end-to-end
+render.
+
+**Why it was wrong.** `_removeAttr(attr)` was hard-coded to operate on
+`this.node` (the element carrying `r-if`), while the `r-else` attribute to
+remove lives on a **sibling element**. The filter ran quietly and threw
+nothing; it just removed nothing, and `r-else` went straight to the DOM.
+
+**How it was fixed.** Added a target parameter:
+`_removeAttr(attr, node = this.node)`, and the else branch passes
+`elsePath.node`.
+
+**Lesson.** A helper that defaults to operating on `this` is a trap when
+handling several nodes at once. And React warnings are real signals, not
+noise: a render that "looks right" with a dirty console still has a bug.
+
+---
+
+## #3 — Settling on a single format, `(item, index) in items` (2026-07-17)
+
+**What happened.** At first both `item in items` and `(item, index) in items`
+were supported (index optional, with `_index` generated when missing). Later
+the bare form was dropped and only the parenthesized form kept.
+
+**Why it changed.** Two syntaxes meant two regex branches, two code-generation
+branches (a `_index` uid versus a real identifier) and two sets of tests, in
+**both places** (the Babel plugin and the VSCode extension), which had to
+match exactly. Every new feature had to be written twice. A single mandatory
+format makes the regex simpler, leaves one error message, and removes any
+chance of the plugin and the extension disagreeing on syntax.
+
+**Lesson.** In a home-made DSL, "supporting several ways to write it" is debt,
+not convenience. When the same syntax is parsed at several layers (compiler
+and editor tooling), keep the number of variants as small as possible.
+
+---
+
+## #4 — Extension v1: hover in the element body shows `any` (2026-07-17)
+
+**What happened.** Virtual document v1 only rewrote the **attribute**:
 `r-for="(item, index) in items"` → `r-for={[...(items)].map((item, index) => item)}`.
-Hover trong chuỗi thì đẹp, nhưng hover `{item.message}` trong **thân element**
-ra `any`.
+Hover inside the string worked, but hovering `{item.message}` in the
+**element body** showed `any`.
 
-**Tại sao sai.** Với TypeScript, `item` trong thân element vẫn là biến không
-tồn tại — binding chỉ sống bên trong attribute đã viết lại, không phủ ra
-children. Virtual document mới chỉ làm chuỗi "parse được", chứ chưa tái hiện
-**ngữ nghĩa runtime** (Babel bọc cả element vào callback của `.map`).
+**Why it was wrong.** To TypeScript, `item` in the element body was still an
+unknown variable: the binding lived only inside the rewritten attribute and
+did not reach the children. The virtual document only made the string
+"parseable"; it did not reproduce the **runtime semantics** (Babel wraps the
+whole element in the `.map` callback).
 
-**Sửa như nào.** Viết lại `lib/virtual.js`: dùng chính parser của TypeScript
-(`ts.createSourceFile`) tìm element mang directive — regex không thể xác định
-ranh giới element (tag lồng nhau, self-closing) — rồi bọc **nguyên element**:
-`{[...(items)].map((item, index) => <li>...children...</li>)}`. Thêm khái niệm
-`scopes` (phạm vi element có r-for) để extension chỉ trả lời trong phạm vi đó,
-ngoài ra vẫn nhường TS built-in.
+**How it was fixed.** Rewrote `lib/virtual.js` to use TypeScript's own parser
+(`ts.createSourceFile`) to find elements carrying directives (a regex cannot
+find element boundaries: nested tags, self-closing tags), then wrap the
+**whole element**: `{[...(items)].map((item, index) => <li>...children...</li>)}`.
+Added `scopes` (the range of an element with r-for) so the extension only
+answers inside them and leaves everything else to the built-in TS server.
 
-**Bài học.** Virtual document phải mô phỏng đúng **những gì code sẽ là lúc
-runtime**, không phải phiên bản "đủ để hết lỗi parse". Và khi cần ranh giới
-cú pháp thật (element bắt đầu/kết thúc ở đâu) thì dùng parser thật — regex chỉ
-đủ cho token phẳng.
-
----
-
-## #5 — Hover ra `any` dù mapping đúng: thiếu types của React (2026-07-17)
-
-**Chuyện gì xảy ra.** Example đổi sang `const [items] = useState(...)` — hover
-`item` lập tức ra `any` dù virtual document sinh đúng.
-
-**Tại sao sai.** Không phải bug logic: language service của extension không
-resolve được module `'react'` (thư mục `vscode-vitu` chưa cài
-`react`/`@types/react`), nên `useState` là `any`, kéo theo cả chuỗi suy luận
-sập về `any`. Mảng literal (`const users = [...]`) không sao vì type suy thẳng
-từ giá trị.
-
-**Sửa như nào.** `pnpm add -D react @types/react` trong `vscode-vitu`. Với
-project thật của người dùng thì không cần — `react` luôn có sẵn trong
-`node_modules` của họ.
-
-**Bài học.** Khi language service trả `any`, nghi phạm số một là **module
-resolution đứt**, không phải mapping sai. Kiểm tra import resolve được chưa
-trước khi debug logic của mình.
+**Lesson.** A virtual document must reproduce **what the code is at
+runtime**, not a version that is "just enough to stop parse errors". When you
+need real syntactic boundaries (where an element starts and ends), use a real
+parser; a regex is only good for flat tokens.
 
 ---
 
-## #6 — Tooltip thừa một dòng `any`: hover bị gộp từ nhiều provider (2026-07-17)
+## #5 — Hover shows `any` even though the mapping is right: React types missing (2026-07-17)
 
-**Chuyện gì xảy ra.** Sau #4, hover `item.message` ra đúng
-`(property) message: string`… kèm thêm một dòng `any` lơ lửng bên dưới.
+**What happened.** The example switched to `const [items] = useState(...)`,
+and hovering `item` immediately showed `any`, even though the virtual
+document was generated correctly.
 
-**Tại sao sai.** Tooltip của VSCode **gộp kết quả của mọi hover provider**.
-Dòng đúng là của extension; dòng `any` là của TS server built-in — nó nhìn file
-gốc, nơi `item` không tồn tại, và quick info cho identifier không resolve được
-là `any`. Extension API không có cách nào xóa kết quả của provider khác.
+**Why it was wrong.** Not a logic bug: the extension's language service could
+not resolve the `'react'` module (`vscode-vitu` did not have
+`react`/`@types/react` installed), so `useState` was `any` and the whole
+inference chain collapsed to `any`. An array literal (`const users = [...]`)
+was fine because its type comes straight from the value.
 
-**Sửa như nào.** Làm theo cách Volar (Vue): viết `typescript-vitu-plugin` nạp
-vào tsserver built-in qua `contributes.typescriptServerPlugins`. Plugin proxy
-language service, chỉ can thiệp 2 hàm: chặn quick info tại identifier **không
-resolve được symbol** nằm trong element có r-for, và lọc diagnostics
-`Cannot find name` (2304/2552) trong cùng phạm vi — quan trọng cho `.tsx`, nơi
-TS built-in thực sự type-check. Ngoài phạm vi r-for, mọi thứ pass-through
-nguyên vẹn; `tsc`/CI không bị ảnh hưởng vì plugin chỉ sống trong editor.
+**How it was fixed.** `pnpm add -D react @types/react` in `vscode-vitu`. Real
+user projects don't need this: `react` is always in their `node_modules`.
 
-**Bài học.** Giới hạn của extension API không phải ngõ cụt — tầng đúng để can
-thiệp hành vi TS built-in là tsserver plugin, kênh chính thức mà Volar cũng
-dùng. Điều kiện chặn phải hẹp nhất có thể (symbol unresolved + trong scope)
-để không nuốt nhầm thông tin thật.
+**Lesson.** When the language service returns `any`, the first suspect is
+**broken module resolution**, not a wrong mapping. Check that imports resolve
+before debugging your own logic.
 
 ---
 
-## #7 — `user.name` trong body trắng "phèn": semantic highlighter mù (2026-07-17)
+## #6 — An extra `any` line in the tooltip: hovers merged from several providers (2026-07-17)
 
-**Chuyện gì xảy ra.** Code trong thân element r-for không có màu — `user.name`
-trắng toát, trong khi cùng đoạn đó viết `.map()` tay thì màu đầy đủ.
+**What happened.** After #4, hovering `item.message` showed the correct
+`(property) message: string`… plus a stray `any` line underneath.
 
-**Tại sao sai.** Semantic token của TS built-in chỉ phát cho identifier resolve
-được. `user`/`index` với nó là biến lạ → không có token → rớt về màu TextMate
-mặc định.
+**Why it was wrong.** VSCode's tooltip **merges the results of every hover
+provider**. The correct line came from the extension; the `any` line came from
+the built-in TS server, which sees the original file where `item` does not
+exist, and quick info for an unresolved identifier is `any`. The extension
+API has no way to remove another provider's results.
 
-**Sửa như nào.** Extension đã có classifications từ virtual document (nơi
-`user` là parameter thật) nhưng chỉ dùng cho phần trong chuỗi directive. Mở
-rộng: classify **cả file virtual**, map từng span ngược về source, áp
-decoration cho token nằm trong `scopes`. Màu dùng lại đúng bảng semantic mặc
-định của Dark+/Light+ (xanh nhạt biến/property, vàng hàm, xanh ngọc type).
+**How it was fixed.** Did what Volar (Vue) does: wrote
+`typescript-vitu-plugin`, loaded into the built-in tsserver through
+`contributes.typescriptServerPlugins`. The plugin proxies the language service
+and only touches two functions: it blocks quick info on identifiers that
+**resolve to no symbol** inside an element with r-for, and filters
+`Cannot find name` diagnostics (2304/2552) in the same range, which matters
+for `.tsx`, where the built-in server really type-checks. Outside r-for
+elements everything passes through untouched; `tsc`/CI are unaffected because
+the plugin only lives in the editor.
 
-**Bài học.** Highlight cho DSL nên làm code trông **giống code thường**, không
-phải nổi bật hơn (tham khảo bài syntax highlighting của Tonsky) — tái dùng màu
-theme thay vì bịa bảng màu riêng. Điểm nhấn duy nhất đáng giữ: gạch chân nội
-dung directive và màu keyword `in`/`of`/`from` để đánh dấu "đây là DSL".
-
----
-
-## #8 — Scoped slot: `<slot>` lấy `children` từ đâu (2026-07-19)
-
-**Chuyện gì xảy ra.** Thêm cặp directive scoped slot: `<slot item={row} />`
-bên trong component đẩy dữ liệu ra, `r-slot="{ item }"` phía gọi nhận về. Bản
-transform đầu lấy `children` bằng `path.getFunctionParent()` — và hỏng ngay khi
-outlet nằm trong `r-for`.
-
-**Tại sao sai.** Sau khi `handleRFor()` chạy, element đã bị bọc vào
-`.map((row, i) => ...)`. Function parent gần nhất của `<slot>` không còn là
-component nữa mà là **callback của `.map`**, params của nó là loop binding —
-`children` thành `row.children`. Cùng chuyện đó xảy ra với `.map()` viết tay.
-
-**Sửa như nào.** `_childrenRef()` leo tiếp chừng nào function cha còn là
-**argument của một CallExpression** (dấu hiệu của callback), rồi mới dừng ở
-component thật. Nếu component chưa destructure `children` thì chèn binding vào
-params — tác giả không phải khai báo gì.
-
-**Bài học.** Trong một visitor chạy nhiều directive trên cùng element, thứ tự
-transform là một phần của ngữ nghĩa: `getFunctionParent()` trả lời cho **AST
-sau khi đã sửa**, không phải AST tác giả viết. Đi tìm "component" thì phải mô
-tả được component khác callback ở chỗ nào.
+**Lesson.** A limit of the extension API is not a dead end: the right layer
+for changing built-in TS behavior is a tsserver plugin, the official channel
+Volar also uses. The blocking condition must be as narrow as possible
+(unresolved symbol and inside the scope) so real information isn't swallowed.
 
 ---
 
-## #9 — Type cho slot mà không bắt khai báo `children` (2026-07-19)
+## #7 — `user.name` in the body is plain white: the semantic highlighter is blind (2026-07-17)
 
-**Chuyện gì xảy ra.** Slot chạy đúng lúc runtime, nhưng trong editor `item`
-của `r-slot="{ item }"` là `any`. Muốn có type thì bình thường phải bắt tác giả
-tự viết kiểu cho `children` — đúng thứ mà cả hai bên Vue lẫn directive này cố
-tránh.
+**What happened.** Code in the body of an r-for element had no color:
+`user.name` was plain white, while the same code written with a manual
+`.map()` was fully colored.
 
-**Tại sao khó.** Kiểu của slot nằm ở **chỗ khác file khác** với nơi tiêu thụ nó:
-nó sinh ra từ các attribute trên `<slot>` bên trong component (và có thể nằm
-trong một hay nhiều `r-for` lồng nhau), còn nơi cần nó là thân element `r-slot`
-ở call site. Không có kênh nào sẵn để type đi từ chỗ này sang chỗ kia.
+**Why it was wrong.** The built-in TS server only emits semantic tokens for
+identifiers it can resolve. To it, `user`/`index` are unknown variables, so
+they get no token and fall back to the default TextMate color.
 
-**Sửa như nào.** Cho type đi nhờ **return type của component**. Trong virtual
-document: mỗi outlet sinh một const bắt kiểu, **replay lại đúng chuỗi `r-for`
-bao quanh** để các expression nhìn thấy loop binding
-(`const __vituS0 = [...(data)].map((entry, i) => ({ item: (entry), index: (i) }))[0]`);
-mọi `return` của component bọc trong `__vituCapture(jsx, __vituS0)` khai báo
-`J & { __vituSlots: S }`; phía call site, children thành render function có
-tham số `__VituSlots<typeof List>` — `.tsx` annotate thẳng, `.jsx` dùng JSDoc
-`@type`. Hai helper sống trong một `.d.ts` ảo do `lib/service.js` bơm vào.
+**How it was fixed.** The extension already had classifications from the
+virtual document (where `user` is a real parameter) but only used them inside
+the directive string. Extended this: classify **the whole virtual file**, map
+each span back to the source, and apply decorations to tokens inside
+`scopes`. The colors reused the default Dark+/Light+ semantic palette (light
+blue for variables/properties, yellow for functions, teal for types).
 
-**Bài học.** Muốn type chảy qua ranh giới module thì phải gắn nó vào thứ
-TypeScript vốn đã mang qua ranh giới đó — ở đây là return type. Điều kiện duy
-nhất còn lại là props của component có kiểu (JSDoc hoặc TS), giống hệt vai trò
-của `defineProps` bên Vue.
+**Lesson.** Highlighting a DSL should make the code look **like ordinary
+code**, not stand out more (see Tonsky's post on syntax highlighting): reuse
+the theme's colors instead of inventing a palette. The only accent worth
+keeping was underlining the directive content and coloring the `in`/`of`/`from`
+keyword to mark "this is DSL". (Replaced in #14: decorations and underline
+were removed and coloring moved to a TextMate grammar.)
 
 ---
 
-## #10 — Slot qua `import`: virtual hóa cả file không mở (2026-07-19)
+> Entries #8–#11 are about scoped slots, a feature removed in #13. They are
+> kept because the lessons still apply.
 
-**Chuyện gì xảy ra.** #9 chạy ngon khi component và call site **cùng một file**.
-Tách `List` ra `./Slots` rồi import vào là `item` trở lại `any`.
+## #8 — Scoped slots: where does `<slot>` get `children` from (2026-07-19)
 
-**Tại sao sai.** Language service chỉ override nội dung của **file đang mở**;
-file import vào được đọc thẳng từ đĩa. Mà trên đĩa `List` vẫn còn `<slot>` và
-`r-for` — cú pháp mà TS không hiểu, và tuyệt nhiên không có `__vituCapture` nào
-để mang type ra. Return type của nó vô dụng.
+**What happened.** Added a pair of scoped-slot directives: `<slot item={row} />`
+inside a component pushes data out, and `r-slot="{ item }"` at the call site
+receives it. The first transform found `children` with
+`path.getFunctionParent()`, and it broke as soon as the outlet sat inside an
+`r-for`.
 
-**Sửa như nào.** `getScriptSnapshot` chạy `buildVirtual` **lúc đọc file** cho
-mọi source file có dấu hiệu directive (`SCRIPT_EXT_RE` + `DIRECTIVE_HINT_RE`),
-lỗi thì rơi về nội dung gốc. Hai gạn lọc để rẻ: chỉ file script, và chỉ khi
-content khớp regex — file thường không trả giá gì.
+**Why it was wrong.** After `handleRFor()` runs, the element is already
+wrapped in `.map((row, i) => ...)`. The nearest function parent of `<slot>` is
+no longer the component but **the `.map` callback**, whose params are the loop
+bindings, so `children` became `row.children`. The same happens with a
+hand-written `.map()`.
 
-**Bài học.** "Virtual document" không phải là chuyện của riêng buffer đang mở.
-Hễ một type phải đi xuyên `import`, thì **mọi file trên đường đi** đều phải là
-bản virtual — nếu không, ranh giới module chính là chỗ type chết.
+**How it was fixed.** `_childrenRef()` keeps climbing while the parent function
+is **an argument of a CallExpression** (the mark of a callback), and only stops
+at the real component. If the component does not destructure `children`, the
+binding is inserted into its params, so the author declares nothing.
 
----
-
-## #11 — Dọn nhiễu quanh slot: sai chỗ, sai lỗi, và lỗi trùng (2026-07-19)
-
-**Chuyện gì xảy ra.** Slot type đúng rồi thì lộ ba loại gạch đỏ giả: attribute
-trên `<slot>` bị TS chửi là prop lạ của `HTMLSlotElement`; element mang `r-slot`
-bị chửi prop không khớp; và một lỗi thật trong `r-slot` hiện **hai lần**.
-
-**Tại sao sai.** Ba nguyên nhân khác nhau, không gộp được:
-`<slot>` với TS built-in là web-component tag có sẵn; children của element
-`r-slot` chỉ là render function **sau transform**, trước đó vẫn là JSX thường
-nên không khớp props; còn lỗi trùng là do chính #9 — capture replay lại chuỗi
-`r-for`, nên một expression sai có **hai bản sinh** cùng map về một span nguồn.
-
-**Sửa như nào.** Trong `typescript-vitu-plugin`: mute toàn bộ attribute của
-`<slot>`, và lọc riêng nhóm code lỗi prop (2322/2339/2559/2739/2740/2769)
-**chỉ trong opening tag** của element có `r-slot`. Trong extension: dedupe
-diagnostics theo khóa `start:end:code` sau khi map về nguồn.
-
-**Bài học.** Sinh code có bản sao thì diagnostics cũng có bản sao — dedupe là
-phần bắt buộc của pipeline mapping, không phải chi tiết làm đẹp. Và mỗi lần
-chặn lỗi của TS built-in, phạm vi phải hẹp đến mức mô tả được bằng một câu
-("prop error, trong opening tag, của element có r-slot") — rộng hơn là bắt đầu
-nuốt lỗi thật.
+**Lesson.** In a visitor that runs several directives on the same element,
+transform order is part of the semantics: `getFunctionParent()` answers for
+**the AST after it has been modified**, not the AST the author wrote. To find
+"the component" you must be able to say how a component differs from a
+callback.
 
 ---
 
-## #12 — `r-if`/`r-else`: test đầu tiên lòi ra hai bug (2026-10-05)
+## #9 — Typing slots without making authors declare `children` (2026-07-19)
 
-**Chuyện gì xảy ra.** Viết test cho plugin (`scripts/_tests_/`) thì hai case
-`r-if` cho output sai:
+**What happened.** Slots worked at runtime, but in the editor `item` from
+`r-slot="{ item }"` was `any`. Getting a type would normally mean making the
+author write a type for `children`, which is exactly what both Vue and this
+directive try to avoid.
 
-- `<div><p r-if={ok}>yes</p></div>` ra `<div>ok ? <p>yes</p> : null</div>` —
-  đúng lỗi của #1, nhưng ở `handleRIf()`.
-- `<p r-if={a}/><p r-if={b}/><p r-else/>` ra `a ? … : <else>` và phần tử
-  `r-if={b}` **biến mất**.
+**Why it was hard.** A slot's type lives **somewhere else, in another file**,
+from where it is consumed: it comes from the attributes on `<slot>` inside the
+component (possibly inside one or more nested `r-for`s), while it is needed in
+the body of the `r-slot` element at the call site. There is no ready-made
+channel for a type to travel from one to the other.
 
-**Tại sao sai.** (1) #1 chỉ bọc `JSXExpressionContainer` cho `r-for`; `r-if`
-vẫn `replaceWith(conditionalExpression)` trần. Chạy chung pass với
-`preset-react` thì vẫn render đúng nên không ai thấy. (2) `handleRIf()` tìm
-`r-else` bằng `siblings.find(...)` — tức là `r-else` **đầu tiên ở bất kỳ đâu
-phía sau**, rồi xóa hết mọi sibling nằm giữa.
+**How it was fixed.** Let the type ride on **the component's return type**. In
+the virtual document, each outlet generates a const that captures the type,
+**replaying the surrounding `r-for` chain** so the expressions see the loop
+bindings
+(`const __vituS0 = [...(data)].map((entry, i) => ({ item: (entry), index: (i) }))[0]`).
+Every `return` of the component is wrapped in `__vituCapture(jsx, __vituS0)`,
+declared as `J & { __vituSlots: S }`. At the call site, children become a
+render function whose parameter is `__VituSlots<typeof List>`: `.tsx`
+annotates it directly, `.jsx` uses a JSDoc `@type`. Both helpers live in a
+virtual `.d.ts` injected by `lib/service.js`.
 
-**Sửa như nào.** Gom phần bọc container vào `_asChild()` dùng chung cho
-`r-for`, `r-if` và `<slot>`. `r-else` chỉ ghép với phần tử **ngay sau** `r-if`
-(bỏ qua text toàn whitespace); không phải thì nhánh còn lại là `null`.
-
-**Bài học.** Sửa một bug theo từng handler thì handler bên cạnh vẫn còn bug đó
-— sửa ở helper dùng chung. Và "render đúng" chưa đủ: output in ra cũng phải là
-JSX hợp lệ, vì plugin có thể chạy khác pass với JSX transform.
+**Lesson.** To make a type cross a module boundary, attach it to something
+TypeScript already carries across that boundary, here the return type. The
+only remaining requirement is that the component's props are typed (JSDoc or
+TS), the same role `defineProps` plays in Vue.
 
 ---
 
-## Quy ước rút ra cho project
+## #10 — Slots through `import`: virtualizing files that are not open (2026-07-19)
 
-1. **Verify bằng render thật**, không dừng ở so sánh code sinh ra (#1, #2).
-2. **Một cú pháp, nhiều tầng parse** — Babel plugin và extension phải cùng một
-   grammar; giữ grammar nhỏ nhất có thể (#3).
-3. **Virtual document = ngữ nghĩa runtime**, mô phỏng đúng transform thật (#4).
-4. `any` bất thường → kiểm tra **module resolution trước, logic sau** (#5).
-5. Can thiệp TS built-in thì dùng **tsserver plugin**, can thiệp hẹp nhất có
-   thể (#6).
-6. Thứ tự transform là ngữ nghĩa: helper đi tìm node cha phải đúng với AST
-   **sau khi** các directive khác đã chạy (#8).
-7. Type đi xuyên `import` thì gắn vào **return type**, và virtual hóa mọi file
-   trên đường đi, không chỉ file đang mở (#9, #10).
-8. Sinh code có bản sao → **dedupe diagnostics** theo span nguồn; chặn lỗi TS
-   built-in thì phạm vi phải hẹp đến mức mô tả bằng một câu (#11).
-9. **Dùng pnpm** cho mọi thao tác cài đặt trong repo này.
-10. Mỗi directive có test so output trong `scripts/_tests_/`; sửa bug thì
-    thêm test fail-trước-pass-sau (#12).
-11. `dist/` không commit — build lúc publish (`pnpm build`).
+**What happened.** #9 worked when the component and the call site were in
+**the same file**. Moving `List` into `./Slots` and importing it turned `item`
+back into `any`.
+
+**Why it was wrong.** The language service only overrides the content of
+**the open file**; imported files are read straight from disk. On disk, `List`
+still has `<slot>` and `r-for`, syntax TS does not understand, and no
+`__vituCapture` to carry the type out. Its return type was useless.
+
+**How it was fixed.** `getScriptSnapshot` runs `buildVirtual` **when reading a
+file**, for every source file that looks like it has directives
+(`SCRIPT_EXT_RE` + `DIRECTIVE_HINT_RE`), falling back to the original content
+on error. Two filters keep it cheap: script files only, and only when the
+content matches the regex, so ordinary files pay nothing.
+
+**Lesson.** A "virtual document" is not just about the open buffer. Whenever a
+type has to cross an `import`, **every file along the way** must be the virtual
+version; otherwise the module boundary is where the type dies.
+
+---
+
+## #11 — Cleaning up slot noise: wrong place, wrong error, duplicate error (2026-07-19)
+
+**What happened.** Once slot types were right, three kinds of false red
+squiggles showed up: TS complained that attributes on `<slot>` were unknown
+props of `HTMLSlotElement`; elements with `r-slot` got prop-mismatch errors;
+and a real error inside `r-slot` showed up **twice**.
+
+**Why it was wrong.** Three different causes that couldn't be merged. To the
+built-in TS server, `<slot>` is a built-in web-component tag. The children of
+an `r-slot` element are only a render function **after the transform**; before
+that they are ordinary JSX, so they don't match the props. And the duplicate
+came from #9 itself: the capture replays the `r-for` chain, so a bad
+expression has **two generated copies** mapping to one source span.
+
+**How it was fixed.** In `typescript-vitu-plugin`: mute every attribute of
+`<slot>`, and filter the prop error codes (2322/2339/2559/2739/2740/2769)
+**only within the opening tag** of an element with `r-slot`. In the extension:
+dedupe diagnostics by a `start:end:code` key after mapping to the source.
+
+**Lesson.** Generated code with copies produces diagnostics with copies:
+deduping is a required part of the mapping pipeline, not polish. And every
+time you suppress a built-in TS error, the scope must be narrow enough to
+describe in one sentence ("prop error, in the opening tag, of an element with
+r-slot"); anything wider starts swallowing real errors.
+
+---
+
+## #12 — `r-if`/`r-else`: the first tests turned up two bugs (2026-10-05)
+
+**What happened.** Writing tests for the plugin (`scripts/_tests_/`), two
+`r-if` cases produced the wrong output:
+
+- `<div><p r-if={ok}>yes</p></div>` produced `<div>ok ? <p>yes</p> : null</div>`,
+  exactly the bug from #1, but in `handleRIf()`.
+- `<p r-if={a}/><p r-if={b}/><p r-else/>` produced `a ? … : <else>`, and the
+  `r-if={b}` element **disappeared**.
+
+**Why it was wrong.** (1) #1 only added the `JSXExpressionContainer` wrapping
+for `r-for`; `r-if` still did a bare `replaceWith(conditionalExpression)`. Run
+in the same pass as `preset-react` it still rendered correctly, so nobody
+noticed. (2) `handleRIf()` found `r-else` with `siblings.find(...)`, meaning
+the **first `r-else` anywhere after it**, then deleted every sibling in
+between.
+
+**How it was fixed.** Moved the container wrapping into a shared `_asChild()`
+used by `r-for`, `r-if` and `<slot>`. `r-else` only pairs with the element
+**right after** `r-if` (skipping whitespace-only text); otherwise the other
+branch is `null`.
+
+**Lesson.** Fixing a bug in one handler leaves the same bug in the handler
+next to it; fix it in the shared helper. And "renders correctly" is not
+enough: the printed output must also be valid JSX, because the plugin may run
+in a different pass from the JSX transform.
+
+---
+
+## #13 — Dropping slots, finishing error checking in the editor (2026-11-13)
+
+**What happened.** Scoped slots (#8–#11) brought the most complex part of the
+extension (capturing types through return types, virtualizing imported files,
+three kinds of noise filtering), while the four core directives still had
+gaps: `r-if="ok"` crashed the plugin with a `TypeError`, an orphan `r-else`
+leaked into the DOM, the editor said nothing about malformed `r-for`, and
+`<p r-if={user}>{user.name}</p>` in `.tsx` got "possibly undefined" from the
+built-in TS server even though the runtime condition guards it.
+
+**Why it was wrong.** Three causes:
+
+- The Babel plugin assumed attributes were always well-formed
+  (`rIfAttr.value.expression`).
+- The extension only reproduced the `r-for` transform; `r-if` was still an
+  attribute in the virtual document, so TypeScript did not narrow types in the
+  element body, breaking convention #3 (virtual document = runtime semantics).
+- The grammar was copied in three places (Babel, `lib/virtual.js`, the
+  tsserver plugin) and they had drifted: the editor accepted `v-for`,
+  `r-show="string"` and any iterable (`[...(expr)]`), while Babel did not, so
+  the editor stayed silent and the code blew up at runtime.
+
+**How it was fixed.**
+
+- Removed slots entirely from the Babel plugin, the extension, the tsserver
+  plugin, the tests and the docs.
+- The Babel plugin throws `buildCodeFrameError` for every misuse (table in the
+  README). An `r-else` still on an element when the visitor reaches it means
+  no `r-if` claimed it, since `handleRIf()` has already removed the ones it
+  paired.
+- `typescript-vitu-plugin/collect.js`: **one** directive reader built on the
+  TypeScript parser, shared by the extension and the tsserver plugin, which
+  also returns `problems` with the same wording as Babel.
+- The virtual document reproduces the rest:
+  `{(__vituBool((cond)), (cond)) ? <A/> : <B/>}` for `r-if`/`r-else` (the
+  condition is generated twice, one copy for narrowing and one to enforce a
+  boolean; the comma operator keeps narrowing), `__vituFor(expr).map(...)`
+  accepting arrays only, and `{...__vituBool((cond))}` for `r-show`.
+- The language service reads the project's `tsconfig.json`/`jsconfig.json`;
+  otherwise the user's `strict` would have no effect inside directives.
+- tsserver plugin: inside rewritten elements it defers entirely to the
+  extension (diagnostics and hover), because the built-in server cannot
+  narrow; elsewhere it filters "declared but never read" for variables only
+  read inside an `r-for` string.
+
+**Lesson.** "Editor error checking" is only trustworthy when it rejects exactly
+what the compiler rejects, so the grammar must have a single source, and the
+virtual document must be a complete translation rather than stopping at the
+hardest directive. Dropping a big feature (slots) is much cheaper than keeping
+it while the core is unfinished.
+
+---
+
+## #14 — Directives looked like underlined strings: moving to TextMate like Volar (2026-11-13)
+
+**What happened.** Looking at a real file in the user's theme: every `r-for`
+string was underlined, `(item, index)` was one color and `in` another, both
+unlike the rest of the theme; `r-if`/`r-for` blended in with ordinary
+attributes. Error messages talked about code the user never wrote: "Argument
+of type 'string' is not assignable to parameter of type 'boolean | undefined'".
+`r-for` over a `Set` also dragged in "Type 'unknown' is not assignable to type
+'ReactNode'" in the body.
+
+**Why it was wrong.**
+
+- Coloring was done with decorations using hard-coded Dark+ colors (#7): it
+  ignored the theme, only colored tokens with semantic info, and the underline
+  meant to "mark the DSL" looked like a link or an error.
+- Error messages were TypeScript's verbatim text when it rejected the argument
+  of `__vituBool` / `__vituFor`, two functions that exist only in the virtual
+  document.
+- `__vituFor<T>(source: readonly T[])`: when inference failed, `T = unknown`,
+  so every use of `item` in the body errored as well.
+
+**How it was fixed.**
+
+- `syntaxes/vitu-directives.tmLanguage.json`: a grammar injected into JSX
+  attributes, the way Volar does it for `v-for`/`v-if`. `r-for` gets the
+  `keyword.control.loop` scope and `r-if`/`r-else` get
+  `keyword.control.conditional`; the quotes keep the string color and the
+  inside is code: `item`/`index` are `variable.parameter`, `in|of|from` are
+  keywords, and the source is colored as an expression. Colors come from the
+  theme; the extension contains no color values any more. All decorations were
+  removed.
+- The `r-for` string is matched by **one** regex and colored inside through
+  `captures`; with begin/end, a stray quote inside the expression would let
+  the coloring run past the attribute. Inside a capture, `include` (local,
+  `$base`, or another grammar that isn't loaded) does not work reliably, so
+  the expression is colored with a few self-contained patterns (identifiers,
+  calls, properties, strings, numbers).
+- `lib/diagnostics.js`: one diagnostic collector shared by the extension and
+  the tests. When a helper rejects **the whole** expression, the message is
+  rewritten in directive terms: "r-if expects a boolean, got 'string'…",
+  "r-for expects an array, got 'Set<number>'…". Errors inside the expression
+  keep TypeScript's wording. TS errors carry `source: 'ts'` and the error code
+  like any other TS error; "never read" is faded (`Unnecessary` tag).
+- `__vituFor<S extends readonly any[]>(source: S): S[number][]`: when the
+  source is wrong, `S` falls back to its `any[]` constraint, so the element
+  body gets no follow-up errors.
+
+**Lesson.** DSL highlighting belongs in a grammar, not in decorations: a
+grammar lets the theme choose the colors, while decorations have to guess. And
+error messages are UI: nothing generated in the virtual document should leak
+into the wording.
+
+---
+
+## Project conventions
+
+1. **Verify with a real render**, not just by comparing generated code (#1, #2).
+2. **One syntax, several parse layers**: the Babel plugin and the extension
+   must share one grammar and the same error messages; keep the grammar as
+   small as possible, with a single reader on the editor side (`collect.js`)
+   (#3, #13).
+3. **Virtual document = runtime semantics**: reproduce the real transform (#4).
+4. Unexpected `any` → check **module resolution first, logic second** (#5).
+5. To change built-in TS behavior, use a **tsserver plugin**, and intervene as
+   narrowly as possible (#6).
+6. Transform order is semantics: a helper looking for a parent node must be
+   right for the AST **after** the other directives have run (#8).
+7. To carry a type across an `import`, attach it to the **return type** and
+   virtualize every file along the way, not just the open one (#9, #10).
+8. Generated code with copies → **dedupe diagnostics** by source span; when
+   suppressing built-in TS errors, the scope must be narrow enough to describe
+   in one sentence (#11).
+9. **Use pnpm** for every install in this repo.
+10. Every directive has output tests in `scripts/_tests_/`; a bug fix adds a
+    test that fails before and passes after (#12).
+11. `dist/` is not committed; it is built at publish time (`pnpm build`).

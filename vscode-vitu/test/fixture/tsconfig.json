@@ -1,0 +1,11 @@
+{
+	"compilerOptions": {
+		"strict": true,
+		"noUnusedLocals": true,
+		"jsx": "react-jsx",
+		"target": "esnext",
+		"module": "esnext",
+		"moduleResolution": "bundler",
+		"skipLibCheck": true
+	}
+}

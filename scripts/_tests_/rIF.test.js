@@ -41,7 +41,58 @@ test('r-else only pairs with the r-if directly before it', () => {
 	);
 });
 
-test('an element between r-if and r-else is kept and breaks the pairing', () => {
-	const out = transform('<div><p r-if={a}>1</p><hr /><p r-else>no</p></div>;');
-	assert.match(out, /\{a\?<p>1<\/p>:null\}<hr\/>/);
+test('r-if rejects a missing value', () => {
+	assert.throws(
+		() => transform('<p r-if>yes</p>;'),
+		/r-if expects an expression/
+	);
+});
+
+test('r-if rejects a string value', () => {
+	assert.throws(
+		() => transform('<p r-if="ok">yes</p>;'),
+		/r-if expects an expression/
+	);
+});
+
+test('r-else without an r-if before it is an error', () => {
+	assert.throws(
+		() => transform('<div><p r-else>no</p></div>;'),
+		/r-else must directly follow an element with r-if/
+	);
+});
+
+test('r-else after an element that breaks the pairing is an error', () => {
+	assert.throws(
+		() => transform('<div><p r-if={a}>1</p><hr /><p r-else>no</p></div>;'),
+		/r-else must directly follow an element with r-if/
+	);
+});
+
+test('r-else after r-for combined with r-if is an error', () => {
+	assert.throws(
+		() => transform('<ul><li r-for="(x, i) in xs" r-if={x}>1</li><li r-else>no</li></ul>;'),
+		/r-else must directly follow an element with r-if/
+	);
+});
+
+test('r-else rejects a value', () => {
+	assert.throws(
+		() => transform('<div><p r-if={a}>1</p><p r-else={b}>no</p></div>;'),
+		/r-else takes no value/
+	);
+});
+
+test('r-else rejects r-if on the same element', () => {
+	assert.throws(
+		() => transform('<div><p r-if={a}>1</p><p r-else r-if={b}>2</p></div>;'),
+		/r-else and r-if cannot be used on the same element/
+	);
+});
+
+test('r-else can carry r-for', () => {
+	assert.equal(
+		transform('<ul><li r-if={empty}>none</li><li r-else r-for="(x, i) in xs">{x}</li></ul>;'),
+		'<ul>{empty?<li>none</li>:xs.map((x,i)=><li key={i}>{x}</li>)}</ul>;'
+	);
 });

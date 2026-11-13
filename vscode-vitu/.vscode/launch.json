@@ -14,7 +14,8 @@
 			"name": "Debug Tests",
 			"type": "node",
 			"request": "launch",
-			"program": "${workspaceFolder}/test/run.js",
+			"runtimeArgs": ["--test"],
+			"program": "${workspaceFolder}/test/diagnostics.test.js",
 			"skipFiles": ["<node_internals>/**"]
 		}
 	]

@@ -1,7 +1,7 @@
 {
 	"name": "babel-plugin-v.i.t.u",
 	"version": "1.0.0",
-	"description": "Vue-style directives for React JSX: r-if, r-else, r-show, r-for and scoped slots, compiled away by Babel.",
+	"description": "Vue-style directives for React JSX: r-if, r-else, r-show and r-for, compiled away by Babel.",
 	"type": "module",
 	"main": "dist/index.cjs",
 	"module": "dist/index.js",
@@ -46,8 +46,7 @@
 		"r-if",
 		"r-else",
 		"r-show",
-		"r-for",
-		"scoped-slots"
+		"r-for"
 	],
 	"author": "mid-guy",
 	"license": "MIT",
