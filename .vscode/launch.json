@@ -12,10 +12,11 @@
 			]
 		},
 		{
-			"name": "Run Smoke Tests (vscode-vitu)",
+			"name": "Run Tests (vscode-vitu)",
 			"type": "node",
 			"request": "launch",
-			"program": "${workspaceFolder}/vscode-vitu/test/run.js",
+			"runtimeArgs": ["--test"],
+			"program": "${workspaceFolder}/vscode-vitu/test/diagnostics.test.js",
 			"cwd": "${workspaceFolder}/vscode-vitu",
 			"console": "integratedTerminal"
 		}

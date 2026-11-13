@@ -24,7 +24,6 @@ to your bundle.
 | [`r-else`](#r-if--r-else) | `v-else` | the `:` branch of the preceding `r-if`  |
 | [`r-show`](#r-show) | `v-show`       | `style={{ display: cond ? '' : 'none' }}` |
 | [`r-for`](#r-for)   | `v-for`        | `items.map((item, index) => <el />)`    |
-| [`<slot>` / `r-slot`](#scoped-slots) | scoped slots | a `children` render function |
 
 ## Installation
 
@@ -68,7 +67,7 @@ them once from any `.d.ts` file included in your project:
 
 Renders the element only when the condition is truthy. An `r-else` element
 must come directly after the `r-if` element it belongs to (whitespace between
-them is fine).
+them is fine), as JSX children of the same parent.
 
 ```jsx
 <div>
@@ -90,7 +89,7 @@ Without an `r-else`, the other branch is `null`.
 ### `r-show`
 
 Keeps the element mounted and toggles its `display` style. An existing `style`
-object is preserved.
+is preserved.
 
 ```jsx
 <div r-show={isOpen} style={{ color: 'red' }}>Details</div>
@@ -130,63 +129,31 @@ compiles to
 - `r-for` is applied before `r-if` on the same element, so the condition can
   use the loop bindings.
 
-### Scoped slots
+### Compile errors
 
-`<slot>` inside a component passes data outward; `r-slot` at the call site
-receives it. This is Vue's scoped-slot pattern, compiled to a React render
-prop.
+A directive the plugin cannot compile stops the build with a code frame
+instead of producing broken output:
 
-```jsx
-function List({ rows }) {
-	return (
-		<ul>
-			<li r-for="(row, i) in rows">
-				<slot item={row} index={i}>nothing passed</slot>
-			</li>
-		</ul>
-	);
-}
+| Mistake                                             | Error                                             |
+| --------------------------------------------------- | ------------------------------------------------- |
+| `r-if` / `r-show` without `{expression}` (`r-if="ok"`) | `r-if expects an expression`                   |
+| `r-for={items}`, or a string in another shape       | `r-for expects a string value` / `Invalid r-for expression` |
+| `r-else` that does not directly follow an `r-if` element | `r-else must directly follow an element with r-if` |
+| `r-else={x}`                                        | `r-else takes no value`                           |
+| `r-else` and `r-if` on the same element             | `r-else and r-if cannot be used on the same element` |
 
-<List rows={rows} r-slot="{ item, index }">
-	<b>{index} - {item.label}</b>
-</List>;
-```
-
-compiles to
-
-```jsx
-function List({ children, rows }) {
-	return (
-		<ul>
-			{rows.map((row, i) => (
-				<li key={i}>
-					{typeof children === 'function'
-						? children({ item: row, index: i })
-						: <>nothing passed</>}
-				</li>
-			))}
-		</ul>
-	);
-}
-
-<List rows={rows}>
-	{({ item, index }) => <><b>{index} - {item.label}</b></>}
-</List>;
-```
-
-- The `children` binding is added to the component's props when it is not
-  already destructured.
-- A `<slot>` used without a matching `r-slot` renders its own children as a
-  fallback, or nothing.
-- `v-slot` is accepted as an alias of `r-slot`.
+An element that carries both `r-for` and `r-if` cannot take an `r-else`: the
+condition runs once per item, inside the loop.
 
 ## Editor support
 
-[`vscode-vitu/`](vscode-vitu/) contains a VSCode extension that adds
-completion, hover, go-to-definition and diagnostics inside `r-for` strings and
-scoped slots, with slot types inferred from the component. It is not published
-to the Marketplace yet; see its [README](vscode-vitu/README.md) (Vietnamese)
-for how to run it locally.
+[`vscode-vitu/`](vscode-vitu/) contains a VSCode extension that type-checks
+the directives as they will run: completion, hover and go-to-definition inside
+`r-for` strings and element bodies, type narrowing from `r-if` / `r-else`, and
+the compile errors above shown as you type. It is not published to the
+Marketplace yet; see its [README](vscode-vitu/README.md) for how to run it
+locally. [ARCHITECTURE.md](ARCHITECTURE.md) explains how the plugin and the
+extension fit into the standard React and TypeScript toolchain.
 
 ## Repository layout
 
@@ -195,7 +162,8 @@ for how to run it locally.
 | `scripts/`      | Plugin source, type declarations and tests       |
 | `example/js/`   | Webpack + React app that uses the plugin         |
 | `vscode-vitu/`  | VSCode extension and tsserver plugin             |
-| `DEVLOG.md`     | Development diary (Vietnamese)                   |
+| `ARCHITECTURE.md` | How the plugin and the extension work (diagrams) |
+| `DEVLOG.md`     | Development diary                                |
 
 ## Development
 
@@ -211,8 +179,8 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for the full workflow.
 
 The full history is in [CHANGELOG.md](CHANGELOG.md).
 
-- **Unreleased** (on `main`) — `r-else`, `r-show`, `r-for`, scoped slots
-  (`<slot>` / `r-slot`), the `vscode-vitu` extension, and fixes to how `r-if`
+- **Unreleased** (on `main`) — `r-else`, `r-show`, `r-for`, compile errors
+  for misused directives, the `vscode-vitu` extension, and fixes to how `r-if`
   and `r-else` compile.
 - **1.0.1** (2024-11-06) — published to npm.
 - **1.0.0** (2024-11-03) — initial release with the `r-if` directive.

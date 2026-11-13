@@ -60,7 +60,7 @@ pnpm dev      # webpack dev server, loads ../../scripts/index.cjs directly
 ```bash
 cd vscode-vitu
 pnpm install
-pnpm test         # smoke tests for the language service, no VSCode needed
+pnpm test         # tests for the language service (node:test), no VSCode needed
 pnpm test:debug   # same, paused under the Node inspector
 ```
 
@@ -84,7 +84,8 @@ Extension Development Host.
 
 The plugin and the extension parse the same directive grammar. A change to
 directive syntax has to be made in both `scripts/index.cjs` and
-`vscode-vitu/lib/virtual.js`.
+`vscode-vitu/typescript-vitu-plugin/collect.js` (the parser shared by the
+extension and the tsserver plugin), with the same error messages.
 
 ### Commit messages
 
@@ -93,7 +94,7 @@ example:
 
 ```
 feat: add r-else-if directive
-fix(vscode-vitu): map hover range inside r-slot
+fix(vscode-vitu): map hover range inside r-for
 docs: describe key handling in r-for
 ```
 

@@ -1,8 +1,8 @@
 {
 	"name": "vitu-language-features",
 	"displayName": "V.I.T.U Language Features",
-	"description": "IntelliSense, hover, go-to-definition and diagnostics inside r-for/v-for string directives in JSX/TSX.",
-	"version": "0.0.1",
+	"description": "IntelliSense and error checking for the V.I.T.U directives (r-if, r-else, r-show, r-for) in JSX/TSX.",
+	"version": "0.1.0",
 	"publisher": "mid-guy",
 	"engines": {
 		"vscode": "^1.80.0"
@@ -24,6 +24,17 @@
 				"enableForWorkspaceTypeScriptVersions": true
 			}
 		],
+		"grammars": [
+			{
+				"scopeName": "vitu.directives.injection",
+				"path": "./syntaxes/vitu-directives.tmLanguage.json",
+				"injectTo": [
+					"source.js",
+					"source.js.jsx",
+					"source.tsx"
+				]
+			}
+		],
 		"configurationDefaults": {
 			"[javascriptreact]": {
 				"editor.quickSuggestions": {
@@ -38,8 +49,8 @@
 		}
 	},
 	"scripts": {
-		"test": "node test/run.js",
-		"test:debug": "node --inspect-brk test/run.js"
+		"test": "node --test test/*.test.js",
+		"test:debug": "node --inspect-brk --test test/*.test.js"
 	},
 	"dependencies": {
 		"typescript": "^5.5.0",

@@ -1,0 +1,144 @@
+{
+	"$schema": "https://raw.githubusercontent.com/martinring/tmlanguage/master/tmlanguage.json",
+	"comment": "Injected into JSX attributes. Colours the directives the way Volar colours v-for / v-if: control-flow names as keywords, the r-for value as code instead of a string.",
+	"scopeName": "vitu.directives.injection",
+	"injectionSelector": "L:meta.tag.attributes -comment",
+	"patterns": [
+		{
+			"include": "#r-for-value"
+		},
+		{
+			"include": "#r-for-name"
+		},
+		{
+			"include": "#r-conditional-name"
+		}
+	],
+	"repository": {
+		"r-for-value": {
+			"comment": "Matched in one go so the embedded code can never run past the closing quote. The code is coloured by the small self-contained patterns below: includes inside captures (local, $base, or another grammar that may not be loaded) are not reliable.",
+			"match": "\\s*(r-for)\\s*(=)\\s*([\"'])((?:(?!\\3).)*)(\\3)",
+			"captures": {
+				"1": {
+					"name": "keyword.control.loop.vitu"
+				},
+				"2": {
+					"name": "keyword.operator.assignment.tsx"
+				},
+				"3": {
+					"name": "string.quoted.tsx punctuation.definition.string.begin.tsx"
+				},
+				"4": {
+					"name": "meta.embedded.expression.vitu",
+					"patterns": [
+						{
+							"comment": "(item, index) in|of|from",
+							"match": "\\s*(\\()\\s*([_$[:alpha:]][_$[:alnum:]]*)\\s*(,)\\s*([_$[:alpha:]][_$[:alnum:]]*)\\s*(\\))\\s+(in|of|from)(?=\\s)",
+							"captures": {
+								"1": {
+									"name": "meta.brace.round.tsx"
+								},
+								"2": {
+									"name": "variable.parameter.tsx"
+								},
+								"3": {
+									"name": "punctuation.separator.parameter.tsx"
+								},
+								"4": {
+									"name": "variable.parameter.tsx"
+								},
+								"5": {
+									"name": "meta.brace.round.tsx"
+								},
+								"6": {
+									"name": "keyword.operator.expression.$6.tsx"
+								}
+							}
+						},
+						{
+							"match": "'[^']*'|\"[^\"]*\"|`[^`]*`",
+							"name": "string.quoted.single.tsx"
+						},
+						{
+							"match": "\\b\\d[\\d_]*(?:\\.\\d+)?\\b",
+							"name": "constant.numeric.decimal.tsx"
+						},
+						{
+							"match": "\\b(?:true|false|null|undefined)\\b",
+							"name": "constant.language.tsx"
+						},
+						{
+							"match": "\\bthis\\b",
+							"name": "variable.language.this.tsx"
+						},
+						{
+							"match": "\\b(?:new|typeof|as|satisfies)\\b",
+							"name": "keyword.operator.expression.tsx"
+						},
+						{
+							"match": "(\\??\\.)\\s*([_$[:alpha:]][_$[:alnum:]]*)(?=\\s*\\()",
+							"captures": {
+								"1": {
+									"name": "punctuation.accessor.tsx"
+								},
+								"2": {
+									"name": "entity.name.function.tsx"
+								}
+							}
+						},
+						{
+							"match": "(\\??\\.)\\s*([_$[:alpha:]][_$[:alnum:]]*)",
+							"captures": {
+								"1": {
+									"name": "punctuation.accessor.tsx"
+								},
+								"2": {
+									"name": "variable.other.property.tsx"
+								}
+							}
+						},
+						{
+							"match": "[_$[:alpha:]][_$[:alnum:]]*(?=\\s*\\()",
+							"name": "entity.name.function.tsx"
+						},
+						{
+							"match": "[_$[:alpha:]][_$[:alnum:]]*",
+							"name": "variable.other.readwrite.tsx"
+						},
+						{
+							"match": "[()\\[\\]]",
+							"name": "meta.brace.round.tsx"
+						},
+						{
+							"match": "\\?\\?|\\|\\||&&|[-+*/%!<>=?:]+",
+							"name": "keyword.operator.tsx"
+						},
+						{
+							"match": ",",
+							"name": "punctuation.separator.comma.tsx"
+						}
+					]
+				},
+				"5": {
+					"name": "string.quoted.tsx punctuation.definition.string.end.tsx"
+				}
+			}
+		},
+		"r-for-name": {
+			"match": "\\s*(r-for)(?=\\s|=|/?>|/\\*|//)",
+			"captures": {
+				"1": {
+					"name": "keyword.control.loop.vitu"
+				}
+			}
+		},
+		"r-conditional-name": {
+			"match": "\\s*(r-if|r-else)(?=\\s|=|/?>|/\\*|//)",
+			"captures": {
+				"1": {
+					"name": "keyword.control.conditional.vitu"
+				}
+			}
+		}
+	}
+}

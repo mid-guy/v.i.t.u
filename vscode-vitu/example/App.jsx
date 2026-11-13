@@ -1,65 +1,44 @@
 import React, { useState } from 'react';
 
-const parentMessage = 'Parent';
-
-/**
- * Scoped slot: `<slot>` truyền dữ liệu ra ngoài, không cần khai báo kiểu cho
- * `children` — kiểu của slot được suy thẳng từ các attribute ở đây.
- *
- * @param {{ rows: { id: number, label: string }[] }} props
- */
-function List({ rows }) {
-	return (
-		<ul>
-			<li r-for="(row, i) in rows">
-				<slot item={row} index={i}>{'chưa truyền slot'}</slot>
-			</li>
-		</ul>
-	);
-}
-
 export default function App() {
+	const [isLoggedIn, setIsLoggedIn] = useState(false);
 	const items = [{ message: 'Foo' }, { message: 'Bar' }];
-		const parentMessage = 'Parent';
-	const texts = ['Hello', 'beta'];
 	const users = [{ id: 1, name: 'An' }, { id: 2, name: 'Binh' }];
-	const texts = ['Hello', 'beta'];
-	const isVisible = true;
-	const rows = [{ id: 1, label: 'one' }, { id: 2, label: 'two' }];
+	const userz = [{ id: 1, name: 'An' }, { id: 2, name: 'Binh' }];
+	const parentMessage = 'Parent';
 
 	return (
 		<div>
+			{/* Hover `item`/`index`, type `item.` in the element body */}
 			<li r-for="(item, index) in items">
-					{parentMessage} - {index} - {item.message}
+				{parentMessage} - {index} - {item.message}
 			</li>
-			{items.map((item, index) => (
-				<li key={index}>
-					{parentMessage} - {index} - {item.message}
-				</li>
-			))}
-			{/* Hover vào `text`/`texts`, Ctrl+Space hoặc gõ `.` bên trong chuỗi */}
-			<p r-for="(text, i) from texts">{'row'}</p>
 
-			{/* Cố tình sai tên biến -> gạch đỏ ngay trong chuỗi */}
-			{/* <span r-for="(user, i) of userz">{'row'}</span> */}
+			{/* Wrong variable name -> red squiggle right inside the string */}
+			<span r-for="(user, i) of userz">{'row'}</span>
 
-			{/* Hover `user` ra object, `index` ra number */}
-			<li r-for="(user, index) in users">{'row'}</li>
+			{/* Malformed r-for -> the whole string is underlined in red */}
+			<span r-for="user in users">{'row'}</span>
 
-			{/* r-show chỉ nhận boolean: hover/completion trong biểu thức */}
-			<p r-show={isVisible}>{'shown'}</p>
+			{/* r-if / r-else: the condition must be a boolean */}
+			<p r-if={isLoggedIn}>You are signed in</p>
+			<p r-else>Please sign in</p>
 
-			{/* Không phải boolean -> gạch đỏ "not assignable to boolean" */}
-			{/* <p r-show={parentMessage}>{'x'}</p> */}
+			{/* Not a boolean -> "r-if expects a boolean" */}
+			<p r-if={parentMessage}>{'x'}</p>
+			<p r-show={parentMessage}>{'x'}</p>
 
-			{/* r-show cùng element với r-for: thấy được loop binding */}
-			<li r-for="(user, i) in users" r-show={user.id === 1}>{'row'}</li>
+			{/* r-else not directly after r-if -> red squiggle */}
+			<p r-else>{'orphan'}</p>
 
-			{/* r-slot: hover `item` ra { id, label }, gõ `item.` ra property,
-			    sai tên property thì gạch đỏ — không khai báo children ở đâu cả */}
-			<List rows={rows} r-slot="{ item, index }">
-				<b>{index} - {item.label}</b>
-			</List>
+			{/* r-if / r-show on the same element as r-for: loop bindings are visible */}
+			<li r-for="(user, i) in users" r-if={user.id > 1} r-show={i % 2 === 0}>
+				{user.name}
+			</li>
+	
+			<button onClick={() => setIsLoggedIn((prev) => !prev)}>
+				{isLoggedIn ? 'Sign out' : 'Sign in'}
+			</button>
 		</div>
 	);
 }

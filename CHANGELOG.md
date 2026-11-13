@@ -5,7 +5,7 @@ based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/), and the
 project follows [Semantic Versioning](https://semver.org/).
 
 The reasoning behind each entry — what went wrong and how it was fixed — is in
-[DEVLOG.md](DEVLOG.md) (Vietnamese).
+[DEVLOG.md](DEVLOG.md).
 
 ## [Unreleased]
 
@@ -16,16 +16,32 @@ The reasoning behind each entry — what went wrong and how it was fixed — is 
   added when the element has no `key`, and `r-for` is applied before `r-if` so
   the condition can use the loop bindings. (DEVLOG #1, #3)
 - `r-else` and `r-show` directives.
-- Scoped slots: `<slot>` inside a component and `r-slot` (alias `v-slot`) at
-  the call site, compiled to a `children` render function. (DEVLOG #8)
-- `r-slot` attribute in the type declarations.
-- `vscode-vitu` extension: completion, hover, go-to-definition and diagnostics
-  for `r-for`/`v-for` and scoped slots, both inside the directive string and
-  in the element body, for JSX and TSX. (DEVLOG #4, #5, #9, #10, #11)
-- `typescript-vitu-plugin` — a tsserver plugin that mutes the `any` hover and
-  the false `Cannot find name` errors the built-in TypeScript service reports
-  for loop bindings. (DEVLOG #6)
-- Semantic highlighting for loop bindings in the element body. (DEVLOG #7)
+- Compile errors for misused directives: `r-if` / `r-show` without an
+  `{expression}`, an `r-else` that does not directly follow an `r-if` element,
+  `r-else` with a value, and `r-else` together with `r-if` on one element.
+  Previously these crashed the plugin or leaked the attribute to the DOM.
+  (DEVLOG #13)
+- `vscode-vitu` extension (0.1.0): completion, hover, go-to-definition and
+  diagnostics for `r-for`, both inside the directive string and in the element
+  body, for JSX and TSX. (DEVLOG #4, #5)
+- `vscode-vitu`: `r-if` / `r-else` are checked as the conditional they compile
+  to, so the element body is narrowed by the condition; `r-if` and `r-show`
+  conditions must be boolean; an `r-for` source must be an array; misused
+  directives are underlined with the same message as the compile error.
+  (DEVLOG #13)
+- `vscode-vitu`: directive highlighting through a TextMate grammar, the way
+  Volar highlights `v-for` / `v-if`: `r-for`, `r-if` and `r-else` are coloured
+  as keywords and the `r-for` value as code, all from the active theme.
+  Type errors on a whole directive read in directive terms
+  (`r-if expects a boolean, got 'string'`), and a non-array `r-for` source no
+  longer causes follow-up errors in the element body. (DEVLOG #14)
+- `vscode-vitu`: the project's `tsconfig.json` / `jsconfig.json` compiler
+  options (`strict`, `paths`, ...) are used when checking directives.
+- `typescript-vitu-plugin` — a tsserver plugin that mutes what the built-in
+  TypeScript service gets wrong inside directive elements: the `any` hover and
+  `Cannot find name` errors for loop bindings, errors `r-if` narrows away, and
+  "declared but never read" for variables used only in an `r-for` string.
+  (DEVLOG #6, #13)
 - `.vscode/launch.json` at the repo root and in `vscode-vitu/`, and a
   `test:debug` script, to run the extension and debug its smoke tests.
 - Tests for every directive (`pnpm test`), and a CI workflow that runs them on
@@ -39,9 +55,9 @@ The reasoning behind each entry — what went wrong and how it was fixed — is 
 
 - `r-for` accepts only `(item, index) in items`; the `item in items` form was
   removed. (DEVLOG #3)
-- `r-else` now pairs only with the `r-if` element directly before it.
-  Previously it paired with the first `r-if` above it and every element in
-  between was silently dropped. (DEVLOG #12)
+- `r-else` now pairs only with the `r-if` element directly before it, both
+  being JSX children. Previously it paired with the first `r-if` above it and
+  every element in between was silently dropped. (DEVLOG #12)
 - `@babel/core` is declared as a peer dependency.
 - Publishing happens only when a `v*` tag is pushed; the workflows that tried
   to publish on every push to `main` were removed.
@@ -50,7 +66,17 @@ The reasoning behind each entry — what went wrong and how it was fixed — is 
 - The `LICENSE` file is now MIT, matching `package.json` and the versions
   already published to npm. It previously contained the Apache-2.0 text.
 
+### Removed
+
+- Scoped slots (`<slot>` / `r-slot`). They were only ever on `main`, never in
+  a published version. The project now focuses on `r-if`, `r-else`, `r-show`
+  and `r-for`. (DEVLOG #13)
+
 ### Fixed
+
+- `r-show` on an element whose `style` is not an object literal
+  (`style={styles}`) crashed the plugin; the style is now spread and `display`
+  applied on top.
 
 - `r-if` on a JSX child was emitted as a bare expression instead of inside an
   expression container, so the compiled output printed as text
